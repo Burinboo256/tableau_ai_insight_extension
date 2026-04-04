@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest manifest-version="0.1" xmlns="http://www.tableau.com/xml/extension_manifest">
-  <desktop-extension id="com.tableau.extension.ai-insight" extension-version="1.0.0">
+  <dashboard-extension id="com.tableau.extension.ai-insight" extension-version="1.0.0">
     <default-locale>en_US</default-locale>
     <name resource-id="name">AI Insight Analyzer</name>
     <description resource-id="description">Analyze Tableau data with OpenRouter AI to generate actionable insights.</description>
@@ -13,5 +13,5 @@
     <permissions>
       <permission>full data</permission>
     </permissions>
-  </desktop-extension>
+  </dashboard-extension>
 </manifest>

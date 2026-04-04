@@ -557,8 +557,9 @@ document.addEventListener('DOMContentLoaded',()=>{
     tableau.extensions.initializeAsync().then(()=>{
       tableauExt=tableau.extensions;
       updateStatus('ok','เชื่อมต่อแล้ว');
-      populateWorksheets();
-    }).catch(()=>{ updateStatus('warn','Sandbox Mode'); populateMockWorksheets(); });
+      try{ populateWorksheets(); }
+      catch(e){ updateStatus('err','ไม่พบ Worksheet บน Dashboard'); console.error('populateWorksheets error:',e); }
+    }).catch(e=>{ updateStatus('warn','Sandbox Mode'); console.warn('initializeAsync rejected:',e); populateMockWorksheets(); });
   }catch(e){ updateStatus('warn','Sandbox Mode'); populateMockWorksheets(); }
 
   document.querySelectorAll('.tab').forEach(t=>{
@@ -594,9 +595,10 @@ async function loadWorksheet(){
   try{
     const dash=tableauExt.dashboardContent.dashboard;
     currentWorksheet=dash.worksheets.find(w=>w.name===wsName);
+    if(!currentWorksheet){ console.error('Worksheet not found:',wsName); loadMockData(wsName); return; }
     const tbl=await currentWorksheet.getSummaryDataAsync({maxRows:500});
     processTblData(tbl);
-  }catch(e){ loadMockData(wsName); }
+  }catch(e){ console.error('loadWorksheet error:',e); loadMockData(wsName); }
 }
 function processTblData(table){
   const cols=table.columns.map(c=>c.fieldName);
