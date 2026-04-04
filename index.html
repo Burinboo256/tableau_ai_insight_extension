@@ -595,10 +595,22 @@ async function loadWorksheet(){
   try{
     const dash=tableauExt.dashboardContent.dashboard;
     currentWorksheet=dash.worksheets.find(w=>w.name===wsName);
-    if(!currentWorksheet){ console.error('Worksheet not found:',wsName); loadMockData(wsName); return; }
-    const tbl=await currentWorksheet.getSummaryDataAsync({maxRows:500});
+    if(!currentWorksheet){ updateStatus('err','ไม่พบ Worksheet: '+wsName); return; }
+    let tbl;
+    // Try newer API (1.10+) first, fall back to legacy getSummaryDataAsync
+    if(typeof currentWorksheet.getSummaryDataReaderAsync==='function'){
+      const reader=await currentWorksheet.getSummaryDataReaderAsync(500,{});
+      tbl=await reader.getAllPagesAsync();
+      await reader.releaseAsync();
+    } else {
+      tbl=await currentWorksheet.getSummaryDataAsync({maxRows:500});
+    }
     processTblData(tbl);
-  }catch(e){ console.error('loadWorksheet error:',e); loadMockData(wsName); }
+    updateStatus('ok','โหลดข้อมูลสำเร็จ');
+  }catch(e){
+    console.error('loadWorksheet error:',e);
+    updateStatus('err','โหลด Worksheet ล้มเหลว: '+e.message);
+  }
 }
 function processTblData(table){
   const cols=table.columns.map(c=>c.fieldName);
@@ -901,7 +913,10 @@ let compareDataA=null, compareDataB=null;
 async function loadCompareSheets(){
   const a=document.getElementById('wsCompareA').value, b=document.getElementById('wsCompareB').value;
   if(!a||!b||a===b){ alert('กรุณาเลือก Worksheet ที่แตกต่างกัน 2 ชีต'); return; }
-  compareDataA=getMockOrReal(a); compareDataB=getMockOrReal(b);
+  try{
+    compareDataA=await fetchWorksheetData(a);
+    compareDataB=await fetchWorksheetData(b);
+  }catch(e){ updateStatus('err','โหลด Compare Sheets ล้มเหลว: '+e.message); return; }
   document.getElementById('compareALabel').textContent='📊 '+a;
   document.getElementById('compareBLabel').textContent='📊 '+b;
   renderMiniPreview('previewA',compareDataA); renderMiniPreview('previewB',compareDataB);
@@ -910,7 +925,24 @@ async function loadCompareSheets(){
   document.getElementById('compareBtn').style.display='flex';
   document.getElementById('compareBtn').disabled=document.getElementById('apiKey').value.trim().length<=10;
 }
-function getMockOrReal(wsName){
+async function fetchWorksheetData(wsName){
+  if(!tableauExt){ return getMockData(wsName); }
+  const dash=tableauExt.dashboardContent.dashboard;
+  const ws=dash.worksheets.find(w=>w.name===wsName);
+  if(!ws) throw new Error('ไม่พบ Worksheet: '+wsName);
+  let tbl;
+  if(typeof ws.getSummaryDataReaderAsync==='function'){
+    const reader=await ws.getSummaryDataReaderAsync(500,{});
+    tbl=await reader.getAllPagesAsync();
+    await reader.releaseAsync();
+  } else {
+    tbl=await ws.getSummaryDataAsync({maxRows:500});
+  }
+  const cols=tbl.columns.map(c=>c.fieldName);
+  const rows=tbl.data.map(row=>{ const o={}; row.forEach((cell,i)=>o[cols[i]]=cell.formattedValue); return o; });
+  return {columns:cols,rows};
+}
+function getMockData(wsName){
   const mocks={'KPI Overview':{columns:['Department','Admissions MTD','Revenue MTD','BOR%','Avg LOS'],rows:[{Department:'Medicine','Admissions MTD':'342','Revenue MTD':'4,250,000','BOR%':'82%','Avg LOS':'4.2'},{Department:'Surgery','Admissions MTD':'198','Revenue MTD':'6,100,000','BOR%':'75%','Avg LOS':'5.8'},{Department:'ICU','Admissions MTD':'45','Revenue MTD':'3,400,000','BOR%':'90%','Avg LOS':'8.4'}]},'Patient Summary':{columns:['Month','New Patients','OPD Visits','IPD Admissions','Satisfaction'],rows:[{Month:'Jan','New Patients':'1,240','OPD Visits':'12,450','IPD Admissions':'741','Satisfaction':'88%'},{Month:'Feb','New Patients':'1,180','OPD Visits':'11,200','IPD Admissions':'698','Satisfaction':'86%'},{Month:'Mar','New Patients':'1,310','OPD Visits':'13,100','IPD Admissions':'812','Satisfaction':'91%'}]},'Revenue Detail':{columns:['Service','Revenue','Margin','WoW Change','Budget Var'],rows:[{Service:'OPD',Revenue:'8,200,000',Margin:'37.8%','WoW Change':'+3.2%','Budget Var':'+2.1%'},{Service:'IPD',Revenue:'15,400,000',Margin:'36.4%','WoW Change':'-1.5%','Budget Var':'-0.8%'},{Service:'Lab',Revenue:'3,100,000',Margin:'61.3%','WoW Change':'+5.4%','Budget Var':'+4.2%'}]}};
   return mocks[wsName]||mocks['KPI Overview'];
 }
