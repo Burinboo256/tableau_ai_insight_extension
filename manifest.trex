@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest manifest-version="0.1" xmlns="http://www.tableau.com/xml/extension_manifest">
+  <desktop-extension id="com.tableau.extension.ai-insight" extension-version="1.0.0">
+    <default-locale>en_US</default-locale>
+    <name resource-id="name">AI Insight Analyzer</name>
+    <description resource-id="description">Analyze Tableau data with OpenRouter AI to generate actionable insights.</description>
+    <author name="Burinboo256" email="your@email.com" organization="Your Org" website="https://burinboo256.github.io/tableau_ai_insight_extension"/>
+    <min-api-version>1.7</min-api-version>
+    <source-location>
+      <url>https://burinboo256.github.io/tableau_ai_insight_extension/index.html</url>
+    </source-location>
+    <icon>iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAACXBIWXMAAAsTAAALEwEAmpwYAAAASElEQVQ4jWNgGAWDDfz//5+BEs2MjIwMlGhGBkY0TZRowjUzMjBQapoYGBgYKNFMDmBgYGCgRDM5gIGBgYESzeQABgYGSjSTAwDGkQ4LfD7NCQAAAABJRU5ErkJggg==</icon>
+    <permissions>
+      <permission>full data</permission>
+    </permissions>
+  </desktop-extension>
+</manifest>

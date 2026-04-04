@@ -1,0 +1,1166 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>AI Insight Analyzer</title>
+<script src="https://cdn.jsdelivr.net/npm/tableau.extensions.1.latest.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#0f1117; --surface:#181c27; --card:#1e2335; --border:#2a3050;
+  --accent:#4f8ef7; --accent2:#7c5cbf; --success:#34d399; --warn:#f59e42;
+  --danger:#f87171; --text:#e2e8f8; --muted:#7a85a3;
+  --font:'IBM Plex Sans Thai',sans-serif; --mono:'IBM Plex Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:13px;height:100vh;display:flex;flex-direction:column;overflow:hidden;}
+
+/* Header */
+.header{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;}
+.header-icon{font-size:20px;} .header-title{font-size:14px;font-weight:600;} .header-sub{font-size:11px;color:var(--muted);margin-top:1px;} .header-right{margin-left:auto;}
+
+/* Tabs */
+.tabs{display:flex;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;}
+.tab{padding:8px 14px;font-size:12px;font-weight:500;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;transition:all .2s;user-select:none;}
+.tab:hover{color:var(--text);} .tab.active{color:var(--accent);border-bottom-color:var(--accent);}
+
+/* Body */
+.body{flex:1;overflow-y:auto;padding:12px 14px;display:flex;flex-direction:column;gap:12px;}
+.body::-webkit-scrollbar{width:4px;} .body::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px;}
+.panel{display:none;flex-direction:column;gap:10px;} .panel.active{display:flex;}
+
+/* Card */
+.card{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:12px;}
+.card-title{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;display:flex;align-items:center;gap:6px;}
+
+/* Form */
+label{font-size:12px;color:var(--muted);margin-bottom:4px;display:block;}
+input[type=text],input[type=password],input[type=number],select,textarea{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:var(--font);font-size:12px;padding:7px 10px;outline:none;transition:border-color .2s;}
+input:focus,select:focus,textarea:focus{border-color:var(--accent);}
+select option{background:var(--surface);} textarea{resize:vertical;min-height:70px;}
+
+/* Mode buttons */
+.mode-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;}
+.mode-btn{display:flex;flex-direction:column;align-items:center;gap:5px;padding:10px 6px;background:var(--bg);border:1px solid var(--border);border-radius:8px;cursor:pointer;transition:all .2s;color:var(--muted);font-size:11px;font-weight:500;text-align:center;user-select:none;}
+.mode-btn .icon{font-size:18px;} .mode-btn:hover{border-color:var(--accent);color:var(--text);}
+.mode-btn.selected{border-color:var(--accent);background:rgba(79,142,247,.1);color:var(--accent);}
+
+/* Fields */
+.field-pool{display:flex;flex-wrap:wrap;gap:6px;max-height:120px;overflow-y:auto;padding:2px;}
+.field-tag{display:flex;align-items:center;gap:4px;padding:4px 8px;background:var(--bg);border:1px solid var(--border);border-radius:20px;font-size:11px;cursor:pointer;transition:all .18s;user-select:none;color:var(--muted);}
+.field-tag:hover{border-color:var(--accent);color:var(--text);}
+.field-tag.selected{background:rgba(79,142,247,.15);border-color:var(--accent);color:var(--accent);}
+.selected-summary{background:var(--bg);border:1px dashed var(--border);border-radius:6px;padding:6px 10px;font-size:11px;color:var(--muted);min-height:32px;}
+
+/* Preview */
+.preview-wrap{overflow-x:auto;border-radius:6px;border:1px solid var(--border);}
+.preview-table{width:100%;border-collapse:collapse;font-size:11px;font-family:var(--mono);}
+.preview-table th{background:var(--surface);color:var(--muted);padding:4px 8px;text-align:left;font-weight:500;border-bottom:1px solid var(--border);white-space:nowrap;}
+.preview-table td{padding:3px 8px;border-bottom:1px solid rgba(42,48,80,.5);color:var(--text);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.preview-table tr:hover td{background:rgba(79,142,247,.04);}
+.preview-table td.anomaly{background:rgba(248,113,113,.08);color:var(--danger);}
+.preview-table td.highlight{background:rgba(52,211,153,.08);color:var(--success);}
+
+/* Buttons */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:8px 16px;border-radius:6px;font-family:var(--font);font-size:12px;font-weight:600;cursor:pointer;transition:all .2s;border:none;outline:none;}
+.btn-primary{background:var(--accent);color:#fff;} .btn-primary:hover{background:#6ba0ff;}
+.btn-outline{background:transparent;border:1px solid var(--border);color:var(--text);} .btn-outline:hover{border-color:var(--accent);color:var(--accent);}
+.btn-danger{background:transparent;border:1px solid var(--border);color:var(--danger);} .btn-danger:hover{border-color:var(--danger);}
+.btn-sm{padding:5px 10px;font-size:11px;} .btn-full{width:100%;} .btn:disabled{opacity:.4;cursor:not-allowed;}
+
+/* Analyze button */
+.analyze-btn{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;font-size:13px;padding:10px;border-radius:8px;border:none;cursor:pointer;width:100%;font-family:var(--font);font-weight:600;display:flex;align-items:center;justify-content:center;gap:8px;transition:opacity .2s;}
+.analyze-btn:hover:not(:disabled){opacity:.88;} .analyze-btn:disabled{opacity:.4;cursor:not-allowed;}
+
+/* Result */
+.result-box{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px;font-size:12.5px;line-height:1.7;color:var(--text);min-height:80px;white-space:pre-wrap;position:relative;}
+.result-box.loading{display:flex;align-items:center;justify-content:center;color:var(--muted);gap:8px;}
+.result-placeholder{color:var(--muted);font-style:italic;}
+
+/* Spinner */
+.spinner{width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+/* Badge */
+.badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:600;}
+.badge-ok{background:rgba(52,211,153,.15);color:var(--success);}
+.badge-warn{background:rgba(245,158,66,.15);color:var(--warn);}
+.badge-err{background:rgba(248,113,113,.15);color:var(--danger);}
+.badge-dot{width:6px;height:6px;border-radius:50%;background:currentColor;}
+
+/* Templates */
+.template-grid{display:flex;flex-direction:column;gap:6px;}
+.template-chip{padding:7px 10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;font-size:11.5px;cursor:pointer;transition:all .18s;color:var(--text);display:flex;align-items:center;gap:6px;}
+.template-chip:hover{border-color:var(--accent);color:var(--accent);}
+
+/* Word limit chips */
+.wl-chip{padding:4px 10px;background:var(--bg);border:1px solid var(--border);border-radius:20px;font-size:11px;cursor:pointer;transition:all .15s;color:var(--muted);user-select:none;}
+.wl-chip:hover{border-color:var(--accent);color:var(--text);}
+.wl-chip.active{background:rgba(79,142,247,.15);border-color:var(--accent);color:var(--accent);font-weight:600;}
+
+/* Token info */
+.token-info{display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;font-size:11px;color:var(--muted);}
+.token-num{color:var(--accent);font-family:var(--mono);font-weight:500;}
+
+/* History */
+.history-item{border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:8px;}
+.history-header{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--surface);cursor:pointer;font-size:11.5px;}
+.history-time{color:var(--muted);font-size:10px;margin-left:auto;}
+.history-body{padding:10px;font-size:12px;line-height:1.65;display:none;}
+.history-body.open{display:block;}
+
+/* Auto-refresh indicator */
+.refresh-pulse{width:8px;height:8px;border-radius:50%;background:var(--success);animation:pulse 2s infinite;}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.5;transform:scale(1.3);}}
+
+/* Temperature slider */
+input[type=range]{-webkit-appearance:none;width:100%;height:4px;border-radius:4px;background:var(--border);outline:none;}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:var(--accent);cursor:pointer;}
+
+/* Export dropdown */
+.export-menu{position:relative;display:inline-block;}
+.export-dropdown{display:none;position:absolute;right:0;top:100%;margin-top:4px;background:var(--surface);border:1px solid var(--border);border-radius:8px;z-index:100;min-width:160px;overflow:hidden;}
+.export-dropdown.open{display:block;}
+.export-item{padding:8px 14px;font-size:12px;cursor:pointer;color:var(--text);transition:background .15s;display:flex;align-items:center;gap:8px;}
+.export-item:hover{background:var(--card);}
+
+/* Multi-sheet compare */
+.ws-compare-row{display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:end;}
+.compare-vs{font-size:11px;color:var(--muted);text-align:center;padding-bottom:8px;}
+
+/* Misc utils */
+.flex{display:flex;} .items-center{align-items:center;} .gap-6{gap:6px;} .gap-8{gap:8px;}
+.ml-auto{margin-left:auto;} .mt-6{margin-top:6px;} .mt-8{margin-top:8px;}
+.text-muted{color:var(--muted);} .text-xs{font-size:11px;}
+.hidden{display:none!important;} .divider{height:1px;background:var(--border);margin:8px 0;}
+.row-config{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.ws-row{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:end;}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="header-icon">🔬</div>
+  <div>
+    <div class="header-title">AI Insight Analyzer</div>
+    <div class="header-sub">Tableau × OpenRouter</div>
+  </div>
+  <div class="header-right" style="display:flex;align-items:center;gap:8px;">
+    <div id="autoRefreshIndicator" style="display:none;align-items:center;gap:5px;font-size:10px;color:var(--success);">
+      <div class="refresh-pulse"></div> Auto
+    </div>
+    <span id="statusBadge" class="badge badge-warn"><span class="badge-dot"></span> ยังไม่เชื่อมต่อ</span>
+  </div>
+</div>
+
+<!-- TABS -->
+<div class="tabs">
+  <div class="tab active" data-tab="analyze">📊 วิเคราะห์</div>
+  <div class="tab" data-tab="compare">🔄 เปรียบเทียบ</div>
+  <div class="tab" data-tab="settings">⚙️ ตั้งค่า</div>
+  <div class="tab" data-tab="history">🕘 ประวัติ</div>
+</div>
+
+<div class="body">
+
+<!-- ══════════════════ ANALYZE PANEL ══════════════════ -->
+<div class="panel active" id="panel-analyze">
+
+  <!-- Step 1: Worksheet -->
+  <div class="card">
+    <div class="card-title">📋 1. เลือก Worksheet</div>
+    <div class="ws-row">
+      <div>
+        <label>Worksheet</label>
+        <select id="wsSelect"><option value="">— รอเชื่อมต่อ Tableau —</option></select>
+      </div>
+      <button class="btn btn-outline btn-sm" onclick="loadWorksheet()">โหลด</button>
+    </div>
+    <!-- Auto-refresh control -->
+    <div style="margin-top:8px;display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--bg);border-radius:6px;border:1px solid var(--border);">
+      <span style="font-size:11px;color:var(--muted);">🔁 Auto-refresh เมื่อ Tableau เปลี่ยน</span>
+      <label style="margin-left:auto;display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);cursor:pointer;">
+        <input type="checkbox" id="autoRefreshEnabled" onchange="toggleAutoRefresh()" style="accent-color:var(--accent);cursor:pointer;">
+        เปิด
+      </label>
+      <select id="autoRefreshTrigger" style="font-size:11px;width:auto;padding:3px 6px;display:none;">
+        <option value="filter">เมื่อ Filter เปลี่ยน</option>
+        <option value="mark">เมื่อ Mark ถูกเลือก</option>
+        <option value="both">ทั้งคู่</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Step 2: Mode -->
+  <div class="card">
+    <div class="card-title">🗂 2. โหมดข้อมูล</div>
+    <div class="mode-grid">
+      <div class="mode-btn selected" data-mode="kpi" onclick="selectMode('kpi')"><span class="icon">📈</span>KPI / Summary</div>
+      <div class="mode-btn" data-mode="aggregate" onclick="selectMode('aggregate')"><span class="icon">🧮</span>Aggregate</div>
+      <div class="mode-btn" data-mode="raw" onclick="selectMode('raw')"><span class="icon">📄</span>Raw Data</div>
+    </div>
+  </div>
+
+  <!-- Step 3: Fields -->
+  <div class="card">
+    <div class="card-title">🏷 3. เลือก Fields</div>
+    <div style="margin-bottom:8px;">
+      <div class="flex gap-6 items-center" style="margin-bottom:6px;">
+        <button class="btn btn-outline btn-sm" onclick="selectAllFields()">เลือกทั้งหมด</button>
+        <button class="btn btn-outline btn-sm" onclick="clearFields()">ล้าง</button>
+        <span class="text-muted text-xs ml-auto" id="fieldCount">0 fields</span>
+      </div>
+      <div class="field-pool" id="fieldPool"><span style="color:var(--muted);font-size:12px;font-style:italic;">โหลด Worksheet ก่อน</span></div>
+    </div>
+    <div class="card-title" style="margin-top:6px;">Fields ที่เลือก</div>
+    <div class="selected-summary" id="selectedSummary"><span style="color:var(--muted);font-style:italic;">ยังไม่ได้เลือก</span></div>
+  </div>
+
+  <!-- Raw config -->
+  <div class="card" id="rowLimitCard" style="display:none;">
+    <div class="card-title">⚙️ ตั้งค่า Raw Data</div>
+    <div class="row-config">
+      <div><label>Rows สูงสุด</label><input type="text" id="rowLimit" value="50"/></div>
+      <div><label>Sample</label><select id="sampleType"><option value="top">Top N</option><option value="random">Random</option></select></div>
+    </div>
+  </div>
+
+  <!-- Preview with anomaly highlight -->
+  <div class="card" id="previewCard" style="display:none;">
+    <div class="card-title flex items-center gap-6">
+      👁 Preview Data
+      <label style="margin-left:auto;display:flex;align-items:center;gap:5px;font-size:10px;color:var(--muted);cursor:pointer;font-weight:400;text-transform:none;letter-spacing:0;">
+        <input type="checkbox" id="anomalyHighlight" checked style="accent-color:var(--accent);"> Highlight ค่าผิดปกติ
+      </label>
+      <span class="text-xs text-muted" id="previewInfo"></span>
+    </div>
+    <div class="preview-wrap"><table class="preview-table" id="previewTable"></table></div>
+    <div id="anomalyLegend" style="display:none;margin-top:6px;gap:10px;" class="flex">
+      <span style="font-size:10px;color:var(--danger);">🔴 ค่าสูงผิดปกติ (&gt;2σ)</span>
+      <span style="font-size:10px;color:var(--success);">🟢 ค่าต่ำผิดปกติ (&lt;-2σ)</span>
+    </div>
+  </div>
+
+  <!-- Prompt -->
+  <div class="card">
+    <div class="card-title">💬 4. Prompt / คำถาม</div>
+    <div class="template-grid" id="templateGrid">
+      <div class="template-chip" onclick="useTemplate('summary')">💡 สรุปภาพรวมข้อมูลนี้</div>
+      <div class="template-chip" onclick="useTemplate('trend')">📈 วิเคราะห์แนวโน้มและความผิดปกติ</div>
+      <div class="template-chip" onclick="useTemplate('action')">🎯 แนะนำ Action ที่ควรดำเนินการ</div>
+      <div class="template-chip" onclick="useTemplate('compare')">🔄 เปรียบเทียบและหาจุดต่างที่สำคัญ</div>
+    </div>
+    <textarea id="promptInput" placeholder="พิมพ์คำถามหรือคลิก template ด้านบน..." style="margin-top:8px;"></textarea>
+
+    <!-- Word Limit -->
+    <div style="margin-top:10px;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+        <span style="font-size:11px;color:var(--muted);">✏️ จำกัดความยาวคำตอบ</span>
+        <label style="margin-left:auto;display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);cursor:pointer;">
+          <input type="checkbox" id="wordLimitEnabled" onchange="toggleWordLimit()" style="accent-color:var(--accent);cursor:pointer;"> เปิด
+        </label>
+      </div>
+      <div id="wordLimitControls" style="display:none;">
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;">
+          <div class="wl-chip" data-val="100" onclick="setWordLimit(100)">100 คำ</div>
+          <div class="wl-chip active" data-val="250" onclick="setWordLimit(250)">250 คำ</div>
+          <div class="wl-chip" data-val="500" onclick="setWordLimit(500)">500 คำ</div>
+          <div class="wl-chip" data-val="750" onclick="setWordLimit(750)">750 คำ</div>
+          <div class="wl-chip" data-val="0" onclick="setWordLimit(0)">ไม่จำกัด</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="font-size:11px;color:var(--muted);white-space:nowrap;">กำหนดเอง:</span>
+          <input type="number" id="wordLimitCustom" min="50" max="5000" value="250" oninput="syncWordLimitFromInput()" style="width:80px;"/>
+          <span style="font-size:11px;color:var(--muted);">คำ</span>
+          <span id="wordLimitBadge" style="margin-left:auto;font-size:11px;padding:3px 10px;border-radius:20px;background:rgba(79,142,247,.15);color:var(--accent);font-weight:600;">~250 คำ</span>
+        </div>
+        <div style="margin-top:8px;display:flex;gap:6px;align-items:center;">
+          <span style="font-size:11px;color:var(--muted);">จำกัดเฉพาะ:</span>
+          <select id="wordLimitScope" style="font-size:11px;padding:3px 6px;">
+            <option value="all">ทุกส่วนรวมกัน</option>
+            <option value="insight">เฉพาะ Insight</option>
+            <option value="suggestions">เฉพาะ Suggestions</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Temperature -->
+    <div style="margin-top:10px;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+        <span style="font-size:11px;color:var(--muted);">🌡 Temperature (ความสร้างสรรค์ของ AI)</span>
+        <span id="tempVal" style="margin-left:auto;font-size:11px;font-family:var(--mono);color:var(--accent);font-weight:600;">0.4</span>
+      </div>
+      <input type="range" id="tempSlider" min="0" max="1" step="0.1" value="0.4" oninput="updateTempLabel()"/>
+      <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-top:4px;">
+        <span>🎯 Precise (0)</span><span>⚖️ Balanced (0.4)</span><span>💡 Creative (1)</span>
+      </div>
+    </div>
+
+    <div class="token-info mt-6">
+      <span>📦 ประมาณ Tokens:</span>
+      <span class="token-num" id="tokenEst">0</span>
+      <span class="ml-auto text-xs text-muted" id="dataRowsInfo">—</span>
+    </div>
+  </div>
+
+  <!-- Data Understanding -->
+  <div id="dataContextCard" class="card" style="display:none;">
+    <div class="card-title flex items-center gap-6">
+      🧩 AI เข้าใจข้อมูลนี้ว่า...
+      <button class="btn btn-outline btn-sm ml-auto" onclick="runUnderstand()">🔄 อัปเดต</button>
+    </div>
+    <div id="dataContextBox" class="result-box" style="min-height:60px;font-size:12px;">
+      <span class="result-placeholder">กดปุ่มด้านล่างเพื่อให้ AI scan schema ก่อนวิเคราะห์</span>
+    </div>
+    <button class="btn btn-outline btn-sm" style="margin-top:8px;width:100%;" id="understandBtn" onclick="runUnderstand()">
+      🔍 ให้ AI ทำความเข้าใจข้อมูลนี้ก่อน
+    </button>
+  </div>
+
+  <!-- Analyze Button -->
+  <button class="analyze-btn" id="analyzeBtn" onclick="runAnalysis()" disabled>✨ วิเคราะห์ด้วย AI</button>
+
+  <!-- Result Tabs -->
+  <div id="resultSection" style="display:none;">
+    <div style="display:flex;background:var(--surface);border:1px solid var(--border);border-radius:8px 8px 0 0;overflow:hidden;">
+      <div class="result-tab active" data-rtab="insight" onclick="switchResultTab('insight')" style="flex:1;padding:8px;text-align:center;font-size:12px;font-weight:600;cursor:pointer;border-bottom:2px solid var(--accent);color:var(--accent);">🧠 Insight</div>
+      <div class="result-tab" data-rtab="suggestions" onclick="switchResultTab('suggestions')" style="flex:1;padding:8px;text-align:center;font-size:12px;font-weight:600;cursor:pointer;border-bottom:2px solid transparent;color:var(--muted);">🎯 Suggestions</div>
+      <div class="result-tab" data-rtab="followup" onclick="switchResultTab('followup')" style="flex:1;padding:8px;text-align:center;font-size:12px;font-weight:600;cursor:pointer;border-bottom:2px solid transparent;color:var(--muted);">🔎 Follow-up</div>
+    </div>
+
+    <!-- Insight tab -->
+    <div id="rtab-insight" style="background:var(--card);border:1px solid var(--border);border-top:none;border-radius:0 0 8px 8px;padding:12px;">
+      <div class="flex items-center gap-6" style="margin-bottom:8px;">
+        <span class="text-xs text-muted">ผลการวิเคราะห์หลัก</span>
+        <div class="export-menu ml-auto">
+          <button class="btn btn-outline btn-sm" onclick="toggleExportMenu('insight')">📤 Export ▾</button>
+          <div class="export-dropdown" id="exportMenu-insight">
+            <div class="export-item" onclick="exportAs('insight','copy')">📋 Copy Text</div>
+            <div class="export-item" onclick="exportAs('insight','markdown')">📝 Copy Markdown</div>
+            <div class="export-item" onclick="exportAs('insight','html')">🌐 Download HTML</div>
+            <div class="export-item" onclick="exportAs('insight','json')">📦 Download JSON</div>
+          </div>
+        </div>
+      </div>
+      <div class="result-box" id="insightBox" style="min-height:100px;"><span class="result-placeholder">ผลการวิเคราะห์จะแสดงที่นี่...</span></div>
+    </div>
+
+    <!-- Suggestions tab -->
+    <div id="rtab-suggestions" style="display:none;background:var(--card);border:1px solid var(--border);border-top:none;border-radius:0 0 8px 8px;padding:12px;">
+      <div class="flex items-center gap-6" style="margin-bottom:8px;">
+        <span class="text-xs text-muted">Actions ที่แนะนำ</span>
+        <div class="export-menu ml-auto">
+          <button class="btn btn-outline btn-sm" onclick="toggleExportMenu('suggestions')">📤 Export ▾</button>
+          <div class="export-dropdown" id="exportMenu-suggestions">
+            <div class="export-item" onclick="exportAs('suggestions','copy')">📋 Copy Text</div>
+            <div class="export-item" onclick="exportAs('suggestions','markdown')">📝 Copy Markdown</div>
+            <div class="export-item" onclick="exportAs('suggestions','html')">🌐 Download HTML</div>
+            <div class="export-item" onclick="exportAs('suggestions','json')">📦 Download JSON</div>
+          </div>
+        </div>
+      </div>
+      <div id="suggestionsBox" style="display:flex;flex-direction:column;gap:8px;min-height:80px;"><span class="result-placeholder text-muted text-xs" style="font-style:italic;">กำลังรอผลการวิเคราะห์...</span></div>
+    </div>
+
+    <!-- Follow-up tab -->
+    <div id="rtab-followup" style="display:none;background:var(--card);border:1px solid var(--border);border-top:none;border-radius:0 0 8px 8px;padding:12px;">
+      <div class="flex items-center gap-6" style="margin-bottom:8px;">
+        <span class="text-xs text-muted">คำถามที่ควรตรวจสอบต่อ</span>
+        <div class="export-menu ml-auto">
+          <button class="btn btn-outline btn-sm" onclick="toggleExportMenu('followup')">📤 Export ▾</button>
+          <div class="export-dropdown" id="exportMenu-followup">
+            <div class="export-item" onclick="exportAs('followup','copy')">📋 Copy Text</div>
+            <div class="export-item" onclick="exportAs('followup','markdown')">📝 Copy Markdown</div>
+            <div class="export-item" onclick="exportAs('followup','html')">🌐 Download HTML</div>
+            <div class="export-item" onclick="exportAs('followup','json')">📦 Download JSON</div>
+          </div>
+        </div>
+      </div>
+      <div id="followupBox" style="display:flex;flex-direction:column;gap:6px;min-height:80px;"><span class="result-placeholder text-muted text-xs" style="font-style:italic;">กำลังรอผลการวิเคราะห์...</span></div>
+    </div>
+
+    <!-- Export ALL -->
+    <div style="margin-top:8px;display:flex;gap:6px;">
+      <button class="btn btn-outline btn-sm" style="flex:1;" onclick="exportAll('html')">📄 Export Report (HTML)</button>
+      <button class="btn btn-outline btn-sm" style="flex:1;" onclick="exportAll('json')">📦 Export All (JSON)</button>
+    </div>
+  </div>
+
+</div><!-- /panel-analyze -->
+
+<!-- ══════════════════ COMPARE PANEL ══════════════════ -->
+<div class="panel" id="panel-compare">
+
+  <div class="card">
+    <div class="card-title">🔄 เปรียบเทียบ 2 Worksheets</div>
+    <div class="ws-compare-row">
+      <div>
+        <label>Worksheet A</label>
+        <select id="wsCompareA"><option value="">— เลือก Sheet A —</option></select>
+      </div>
+      <div class="compare-vs">vs</div>
+      <div>
+        <label>Worksheet B</label>
+        <select id="wsCompareB"><option value="">— เลือก Sheet B —</option></select>
+      </div>
+    </div>
+    <button class="btn btn-outline btn-sm btn-full" style="margin-top:8px;" onclick="loadCompareSheets()">📥 โหลดทั้งสอง Sheets</button>
+  </div>
+
+  <div id="comparePreviewCard" class="card" style="display:none;">
+    <div class="card-title">👁 Preview</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+      <div>
+        <div style="font-size:11px;color:var(--accent);margin-bottom:4px;" id="compareALabel">Sheet A</div>
+        <div class="preview-wrap"><table class="preview-table" id="previewA"></table></div>
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--accent2);margin-bottom:4px;" id="compareBLabel">Sheet B</div>
+        <div class="preview-wrap"><table class="preview-table" id="previewB"></table></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" id="comparePromptCard" style="display:none;">
+    <div class="card-title">💬 คำถามสำหรับเปรียบเทียบ</div>
+    <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px;">
+      <div class="template-chip" onclick="setCmpPrompt('เปรียบเทียบ KPI หลักของทั้งสอง Worksheet และระบุความแตกต่างที่มีนัยสำคัญ')">📊 เปรียบเทียบ KPI หลัก</div>
+      <div class="template-chip" onclick="setCmpPrompt('Worksheet ไหนมี performance ดีกว่า? อธิบายเหตุผลและปัจจัยที่แตกต่างกัน')">🏆 ประเมิน Performance</div>
+      <div class="template-chip" onclick="setCmpPrompt('ระบุ trend ที่เหมือนกันและต่างกันระหว่างสอง Worksheet นี้')">📈 หา Trend ที่ต่างกัน</div>
+    </div>
+    <textarea id="comparePromptInput" placeholder="พิมพ์คำถามสำหรับ AI เพื่อเปรียบเทียบทั้งสอง sheets..." style="min-height:60px;"></textarea>
+  </div>
+
+  <button class="analyze-btn" id="compareBtn" onclick="runCompare()" disabled style="display:none;">🔄 เปรียบเทียบด้วย AI</button>
+
+  <div id="compareResultCard" class="card" style="display:none;">
+    <div class="card-title flex items-center gap-6">
+      📊 ผลการเปรียบเทียบ
+      <div class="export-menu ml-auto">
+        <button class="btn btn-outline btn-sm" onclick="toggleExportMenu('compare')">📤 Export ▾</button>
+        <div class="export-dropdown" id="exportMenu-compare">
+          <div class="export-item" onclick="exportCompare('copy')">📋 Copy Text</div>
+          <div class="export-item" onclick="exportCompare('html')">🌐 Download HTML</div>
+          <div class="export-item" onclick="exportCompare('json')">📦 Download JSON</div>
+        </div>
+      </div>
+    </div>
+    <div class="result-box" id="compareResultBox" style="min-height:120px;"><span class="result-placeholder">ผลเปรียบเทียบจะแสดงที่นี่...</span></div>
+  </div>
+
+</div><!-- /panel-compare -->
+
+<!-- ══════════════════ SETTINGS PANEL ══════════════════ -->
+<div class="panel" id="panel-settings">
+  <div class="card">
+    <div class="card-title">🔑 OpenRouter API</div>
+    <label>API Key</label>
+    <input type="password" id="apiKey" placeholder="sk-or-v1-..." oninput="checkAnalyzeReady()"/>
+    <div class="text-xs text-muted mt-6">รับ API Key ได้ที่ <span style="color:var(--accent);">openrouter.ai/keys</span></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">🤖 Model</div>
+    <label>เลือก Model</label>
+    <select id="modelSelect">
+      <optgroup label="🔵 Anthropic">
+        <option value="anthropic/claude-sonnet-4-5">Claude Sonnet 4.5 (ล่าสุด)</option>
+        <option value="anthropic/claude-3.5-sonnet">Claude 3.5 Sonnet</option>
+        <option value="anthropic/claude-3-haiku">Claude 3 Haiku (เร็ว/ถูก)</option>
+      </optgroup>
+      <optgroup label="🟢 OpenAI">
+        <option value="openai/gpt-4o">GPT-4o</option>
+        <option value="openai/gpt-4o-mini">GPT-4o Mini</option>
+      </optgroup>
+      <optgroup label="🟡 Google">
+        <option value="google/gemini-pro-1.5">Gemini Pro 1.5</option>
+        <option value="google/gemini-flash-1.5">Gemini Flash 1.5</option>
+      </optgroup>
+      <optgroup label="⚪ Meta">
+        <option value="meta-llama/llama-3.1-70b-instruct">Llama 3.1 70B</option>
+        <option value="meta-llama/llama-3.1-8b-instruct">Llama 3.1 8B (ฟรี)</option>
+      </optgroup>
+    </select>
+    <div class="divider"></div>
+    <label>ภาษาผลลัพธ์</label>
+    <select id="outputLang">
+      <option value="th">🇹🇭 ภาษาไทย</option>
+      <option value="en">🇬🇧 English</option>
+      <option value="th-en">🇹🇭+🇬🇧 ไทย + English</option>
+    </select>
+  </div>
+
+  <div class="card">
+    <div class="card-title">📐 System Prompt</div>
+    <label>บทบาทของ AI</label>
+    <textarea id="systemPrompt" style="min-height:100px;">คุณเป็น Data Analyst ผู้เชี่ยวชาญด้านการวิเคราะห์ข้อมูลธุรกิจและโรงพยาบาล ตอบเป็นภาษาไทย ชัดเจน กระชับ และนำเสนอ insight ที่นำไปใช้ได้จริง ใช้ bullet points และ emoji เพื่อให้อ่านง่าย</textarea>
+  </div>
+
+  <div class="card">
+    <div class="card-title">🛡 ความปลอดภัย</div>
+    <label>ซ่อนข้อมูล sensitive</label>
+    <select id="maskSensitive">
+      <option value="none">ไม่ซ่อน</option>
+      <option value="patient">ซ่อน Patient Name / HN</option>
+      <option value="all">ซ่อนทุก PII</option>
+    </select>
+  </div>
+
+  <button class="btn btn-primary btn-full" onclick="saveSettings()">💾 บันทึกการตั้งค่า</button>
+  <div id="settingsMsg" class="hidden"><div class="badge badge-ok" style="margin-top:4px;">✅ บันทึกแล้ว</div></div>
+</div>
+
+<!-- ══════════════════ HISTORY PANEL ══════════════════ -->
+<div class="panel" id="panel-history">
+  <div class="flex gap-6 items-center">
+    <input type="text" id="historySearch" placeholder="🔍 ค้นหา worksheet / prompt..." oninput="renderHistory()" style="flex:1;"/>
+    <select id="historyFilter" onchange="renderHistory()" style="width:auto;font-size:11px;padding:6px;">
+      <option value="">ทุก mode</option>
+      <option value="kpi">KPI</option>
+      <option value="aggregate">Aggregate</option>
+      <option value="raw">Raw</option>
+      <option value="compare">Compare</option>
+    </select>
+    <button class="btn btn-danger btn-sm" onclick="clearHistory()">🗑</button>
+  </div>
+  <div id="historyList"><div class="text-muted text-xs" style="padding:12px 0;text-align:center;font-style:italic;">ยังไม่มีประวัติ</div></div>
+</div>
+
+</div><!-- /body -->
+
+<script>
+// ══════════════════════════════════════════════
+//  STATE
+// ══════════════════════════════════════════════
+let tableauExt=null, currentWorksheet=null;
+let allFields=[], selectedFields=new Set();
+let currentMode='kpi', cachedData=null, dataContext='';
+let autoRefreshHandler=null;
+let lastResult=null, lastCompareResult=null;
+let history=JSON.parse(localStorage.getItem('ai_insight_history')||'[]');
+
+// ══════════════════════════════════════════════
+//  INIT
+// ══════════════════════════════════════════════
+document.addEventListener('DOMContentLoaded',()=>{
+  loadSettingsFromStorage();
+  renderHistory();
+  document.getElementById('promptInput').addEventListener('input',updateTokenEst);
+  document.addEventListener('click', e=>{
+    if(!e.target.closest('.export-menu')) closeAllExportMenus();
+  });
+
+  try{
+    tableau.extensions.initializeAsync().then(()=>{
+      tableauExt=tableau.extensions;
+      updateStatus('ok','เชื่อมต่อแล้ว');
+      populateWorksheets();
+    }).catch(()=>{ updateStatus('warn','Sandbox Mode'); populateMockWorksheets(); });
+  }catch(e){ updateStatus('warn','Sandbox Mode'); populateMockWorksheets(); }
+
+  document.querySelectorAll('.tab').forEach(t=>{
+    t.addEventListener('click',()=>{
+      document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+      document.querySelectorAll('.panel').forEach(x=>x.classList.remove('active'));
+      t.classList.add('active');
+      document.getElementById('panel-'+t.dataset.tab).classList.add('active');
+    });
+  });
+});
+
+// ══════════════════════════════════════════════
+//  TABLEAU
+// ══════════════════════════════════════════════
+function populateWorksheets(){
+  const dash=tableauExt.dashboardContent.dashboard;
+  const opts='<option value="">— เลือก Worksheet —</option>'+dash.worksheets.map(w=>`<option value="${w.name}">${w.name}</option>`).join('');
+  document.getElementById('wsSelect').innerHTML=opts;
+  document.getElementById('wsCompareA').innerHTML=opts;
+  document.getElementById('wsCompareB').innerHTML=opts;
+}
+function populateMockWorksheets(){
+  const opts=`<option value="">— Mock —</option>
+    <option value="KPI Overview">KPI Overview</option>
+    <option value="Patient Summary">Patient Summary</option>
+    <option value="Revenue Detail">Revenue Detail</option>`;
+  ['wsSelect','wsCompareA','wsCompareB'].forEach(id=>document.getElementById(id).innerHTML=opts);
+}
+async function loadWorksheet(){
+  const wsName=document.getElementById('wsSelect').value; if(!wsName) return;
+  if(!tableauExt){ loadMockData(wsName); return; }
+  try{
+    const dash=tableauExt.dashboardContent.dashboard;
+    currentWorksheet=dash.worksheets.find(w=>w.name===wsName);
+    const tbl=await currentWorksheet.getSummaryDataAsync({maxRows:500});
+    processTblData(tbl);
+  }catch(e){ loadMockData(wsName); }
+}
+function processTblData(table){
+  const cols=table.columns.map(c=>c.fieldName);
+  const rows=table.data.map(row=>{ const o={}; row.forEach((cell,i)=>o[cols[i]]=cell.formattedValue); return o; });
+  cachedData={columns:cols,rows}; renderFieldPool(cols); updatePreview(); checkAnalyzeReady();
+}
+
+// ══════════════════════════════════════════════
+//  AUTO-REFRESH (#3)
+// ══════════════════════════════════════════════
+function toggleAutoRefresh(){
+  const enabled=document.getElementById('autoRefreshEnabled').checked;
+  const triggerSel=document.getElementById('autoRefreshTrigger');
+  const indicator=document.getElementById('autoRefreshIndicator');
+  triggerSel.style.display=enabled?'block':'none';
+  indicator.style.display=enabled?'flex':'none';
+
+  if(autoRefreshHandler){ autoRefreshHandler(); autoRefreshHandler=null; }
+  if(!enabled||!tableauExt) return;
+
+  const trigger=triggerSel.value;
+  const dash=tableauExt.dashboardContent.dashboard;
+  const wsName=document.getElementById('wsSelect').value; if(!wsName) return;
+  const ws=dash.worksheets.find(w=>w.name===wsName); if(!ws) return;
+
+  const handler=async()=>{
+    await loadWorksheet();
+    const apiKey=document.getElementById('apiKey').value.trim();
+    if(apiKey&&cachedData&&selectedFields.size>0) await runAnalysis();
+  };
+
+  if(trigger==='filter'||trigger==='both'){
+    const unsub=dash.addEventListener(tableau.TableauEventType.FilterChanged,handler);
+    autoRefreshHandler=unsub;
+  }
+  if(trigger==='mark'||trigger==='both'){
+    const unsub=ws.addEventListener(tableau.TableauEventType.MarkSelectionChanged,handler);
+    autoRefreshHandler=autoRefreshHandler?()=>{autoRefreshHandler();unsub();}:unsub;
+  }
+}
+
+// ══════════════════════════════════════════════
+//  MOCK DATA
+// ══════════════════════════════════════════════
+function loadMockData(wsName){
+  const mocks={
+    'KPI Overview':{
+      columns:['Department','Admissions MTD','Admissions SPLY','Revenue MTD','BOR%','Avg LOS'],
+      rows:[
+        {Department:'Medicine','Admissions MTD':'342','Admissions SPLY':'310','Revenue MTD':'4,250,000','BOR%':'82%','Avg LOS':'4.2'},
+        {Department:'Surgery','Admissions MTD':'198','Admissions SPLY':'220','Revenue MTD':'6,100,000','BOR%':'75%','Avg LOS':'5.8'},
+        {Department:'Pediatrics','Admissions MTD':'156','Admissions SPLY':'140','Revenue MTD':'1,980,000','BOR%':'68%','Avg LOS':'3.1'},
+        {Department:'ICU','Admissions MTD':'45','Admissions SPLY':'52','Revenue MTD':'3,400,000','BOR%':'90%','Avg LOS':'8.4'},
+      ]
+    },
+    'Patient Summary':{
+      columns:['Month','New Patients','Returning','OPD Visits','IPD Admissions','Satisfaction'],
+      rows:[
+        {Month:'Jan','New Patients':'1,240','Returning':'3,820','OPD Visits':'12,450','IPD Admissions':'741','Satisfaction':'88%'},
+        {Month:'Feb','New Patients':'1,180','Returning':'3,650','OPD Visits':'11,200','IPD Admissions':'698','Satisfaction':'86%'},
+        {Month:'Mar','New Patients':'1,310','Returning':'3,940','OPD Visits':'13,100','IPD Admissions':'812','Satisfaction':'91%'},
+      ]
+    },
+    'Revenue Detail':{
+      columns:['Service','Revenue','Cost','Margin','WoW Change','Budget Var'],
+      rows:[
+        {Service:'OPD',Revenue:'8,200,000',Cost:'5,100,000',Margin:'37.8%','WoW Change':'+3.2%','Budget Var':'+2.1%'},
+        {Service:'IPD',Revenue:'15,400,000',Cost:'9,800,000',Margin:'36.4%','WoW Change':'-1.5%','Budget Var':'-0.8%'},
+        {Service:'Lab',Revenue:'3,100,000',Cost:'1,200,000',Margin:'61.3%','WoW Change':'+5.4%','Budget Var':'+4.2%'},
+        {Service:'Pharmacy',Revenue:'4,800,000',Cost:'3,200,000',Margin:'33.3%','WoW Change':'+0.8%','Budget Var':'+1.1%'},
+      ]
+    }
+  };
+  cachedData=mocks[wsName]||mocks['KPI Overview'];
+  renderFieldPool(cachedData.columns); updatePreview(); checkAnalyzeReady();
+}
+
+// ══════════════════════════════════════════════
+//  DATA MODE
+// ══════════════════════════════════════════════
+function selectMode(mode){
+  currentMode=mode;
+  document.querySelectorAll('.mode-btn').forEach(b=>b.classList.toggle('selected',b.dataset.mode===mode));
+  document.getElementById('rowLimitCard').style.display=mode==='raw'?'block':'none';
+  updateTokenEst();
+}
+
+// ══════════════════════════════════════════════
+//  FIELDS
+// ══════════════════════════════════════════════
+function renderFieldPool(cols){
+  allFields=cols; selectedFields=new Set(cols);
+  const pool=document.getElementById('fieldPool'); pool.innerHTML='';
+  cols.forEach(f=>{
+    const tag=document.createElement('div');
+    tag.className='field-tag selected'; tag.dataset.field=f;
+    tag.innerHTML=`<span class="check">✓</span> ${f}`;
+    tag.onclick=()=>toggleField(f,tag); pool.appendChild(tag);
+  });
+  updateFieldSummary();
+}
+function toggleField(f,el){
+  if(selectedFields.has(f)){ selectedFields.delete(f); el.classList.remove('selected'); el.querySelector('.check').textContent=''; }
+  else { selectedFields.add(f); el.classList.add('selected'); el.querySelector('.check').textContent='✓'; }
+  updateFieldSummary(); updateTokenEst();
+}
+function selectAllFields(){ allFields.forEach(f=>{ selectedFields.add(f); const t=document.querySelector(`.field-tag[data-field="${f}"]`); if(t){t.classList.add('selected');t.querySelector('.check').textContent='✓';} }); updateFieldSummary(); }
+function clearFields(){ selectedFields.clear(); document.querySelectorAll('.field-tag').forEach(t=>{t.classList.remove('selected');t.querySelector('.check').textContent='';}); updateFieldSummary(); }
+function updateFieldSummary(){
+  const n=selectedFields.size; document.getElementById('fieldCount').textContent=n+' fields';
+  const el=document.getElementById('selectedSummary');
+  el.innerHTML=n===0?'<span style="color:var(--muted);font-style:italic;">ยังไม่ได้เลือก</span>':[...selectedFields].map(f=>`<span style="color:var(--accent)">${f}</span>`).join(', ');
+  checkAnalyzeReady();
+}
+
+// ══════════════════════════════════════════════
+//  PREVIEW + ANOMALY HIGHLIGHT (#4 partial)
+// ══════════════════════════════════════════════
+function updatePreview(){
+  if(!cachedData) return;
+  document.getElementById('previewCard').style.display='block';
+  const cols=cachedData.columns, rows=cachedData.rows.slice(0,5);
+  const doHighlight=document.getElementById('anomalyHighlight').checked;
+
+  // Compute column stats for numeric anomaly detection
+  const stats={};
+  if(doHighlight){
+    cols.forEach(c=>{
+      const nums=cachedData.rows.map(r=>parseFloat(String(r[c]).replace(/[,%]/g,''))).filter(v=>!isNaN(v));
+      if(nums.length>2){
+        const mean=nums.reduce((a,b)=>a+b,0)/nums.length;
+        const std=Math.sqrt(nums.map(v=>(v-mean)**2).reduce((a,b)=>a+b,0)/nums.length);
+        stats[c]={mean,std};
+      }
+    });
+  }
+
+  let html='<thead><tr>'+cols.map(c=>`<th>${c}</th>`).join('')+'</tr></thead><tbody>';
+  rows.forEach(row=>{
+    html+='<tr>'+cols.map(c=>{
+      const raw=row[c]??''; let cls='';
+      if(doHighlight&&stats[c]){
+        const v=parseFloat(String(raw).replace(/[,%]/g,''));
+        if(!isNaN(v)){
+          if(v>stats[c].mean+2*stats[c].std) cls=' class="anomaly"';
+          else if(v<stats[c].mean-2*stats[c].std) cls=' class="highlight"';
+        }
+      }
+      return `<td${cls}>${raw}</td>`;
+    }).join('')+'</tr>';
+  });
+  html+='</tbody>';
+  document.getElementById('previewTable').innerHTML=html;
+  document.getElementById('previewInfo').textContent=`${cachedData.rows.length} rows × ${cols.length} cols`;
+  const hasStats=Object.keys(stats).length>0;
+  document.getElementById('anomalyLegend').style.display=doHighlight&&hasStats?'flex':'none';
+}
+
+// ══════════════════════════════════════════════
+//  TOKENS
+// ══════════════════════════════════════════════
+function updateTokenEst(){
+  const p=document.getElementById('promptInput').value;
+  const d=buildDataString();
+  document.getElementById('tokenEst').textContent=Math.round((p.length+d.length)/3.5).toLocaleString();
+  document.getElementById('dataRowsInfo').textContent=cachedData?`${cachedData.rows.length} rows loaded`:'—';
+}
+function buildDataString(){
+  if(!cachedData||selectedFields.size===0) return '';
+  const cols=cachedData.columns.filter(c=>selectedFields.has(c));
+  let rows=cachedData.rows;
+  if(currentMode==='kpi') rows=rows.slice(0,30);
+  else if(currentMode==='aggregate') rows=rows.slice(0,50);
+  else{
+    const lim=parseInt(document.getElementById('rowLimit').value)||50;
+    rows=document.getElementById('sampleType').value==='random'?rows.sort(()=>Math.random()-.5).slice(0,lim):rows.slice(0,lim);
+  }
+  return cols.join(' | ')+'\n'+rows.map(r=>cols.map(c=>r[c]??'').join(' | ')).join('\n');
+}
+
+// ══════════════════════════════════════════════
+//  TEMPERATURE (#4)
+// ══════════════════════════════════════════════
+function updateTempLabel(){ document.getElementById('tempVal').textContent=parseFloat(document.getElementById('tempSlider').value).toFixed(1); }
+
+// ══════════════════════════════════════════════
+//  TEMPLATES
+// ══════════════════════════════════════════════
+const templates={
+  summary:'สรุปภาพรวมของข้อมูลนี้ ระบุ KPI สำคัญ จุดเด่น และจุดที่น่ากังวล',
+  trend:'วิเคราะห์แนวโน้มของข้อมูล มีค่าผิดปกติหรือ outlier ไหม? อธิบายสาเหตุที่เป็นไปได้',
+  action:'จากข้อมูลนี้ ควรดำเนินการอะไรบ้างใน 30 วันข้างหน้า? ระบุลำดับความสำคัญ',
+  compare:'เปรียบเทียบข้อมูลในแต่ละกลุ่ม หาความแตกต่างที่มีนัยสำคัญและอธิบายผลกระทบ'
+};
+function useTemplate(key){ document.getElementById('promptInput').value=templates[key]; updateTokenEst(); }
+function setCmpPrompt(t){ document.getElementById('comparePromptInput').value=t; }
+function renderDynamicTemplates(questions){
+  const grid=document.getElementById('templateGrid');
+  grid.querySelectorAll('.template-chip').forEach((c,i)=>{ if(i>=4) c.remove(); });
+  questions.slice(0,3).forEach(q=>{
+    const d=document.createElement('div'); d.className='template-chip';
+    d.style.cssText='border-color:rgba(79,142,247,.4);color:var(--accent);';
+    d.textContent='🤖 '+q;
+    d.onclick=()=>{ document.getElementById('promptInput').value=q; updateTokenEst(); };
+    grid.appendChild(d);
+  });
+}
+
+// ══════════════════════════════════════════════
+//  DATA UNDERSTANDING
+// ══════════════════════════════════════════════
+async function runUnderstand(){
+  const apiKey=document.getElementById('apiKey').value.trim();
+  if(!apiKey||!cachedData){ alert('กรุณาใส่ API Key และโหลด Worksheet ก่อน'); return; }
+  const cols=cachedData.columns.filter(c=>selectedFields.has(c));
+  const sample=[cols.join(' | '),...cachedData.rows.slice(0,5).map(r=>cols.map(c=>r[c]??'').join(' | '))].join('\n');
+  const wsName=document.getElementById('wsSelect').value;
+  const box=document.getElementById('dataContextBox'), btn=document.getElementById('understandBtn');
+  box.className='result-box loading'; box.innerHTML='<div class="spinner"></div> AI กำลังอ่าน schema...'; btn.disabled=true;
+  const prompt=`ข้อมูลจาก Tableau Worksheet "${wsName}" (${cachedData.rows.length} แถว)\nFields: ${cols.join(', ')}\n\nตัวอย่าง:\n\`\`\`\n${sample}\n\`\`\`\n\nตอบ JSON เท่านั้น:\n{"dataset_type":"...","domain":"...","key_metrics":["..."],"dimensions":["..."],"data_quality_notes":"...","analysis_context":"...","suggested_questions":["...","...","..."]}`;
+  try{
+    const resp=await callOpenRouter(apiKey,document.getElementById('modelSelect').value,'You are a data schema analyzer. Respond with valid JSON only.',prompt,600,0.2);
+    const raw=resp.choices?.[0]?.message?.content||'{}';
+    let parsed; try{ parsed=JSON.parse(raw.replace(/```json|```/g,'').trim()); }catch(e){ parsed=null; }
+    if(parsed){
+      dataContext=JSON.stringify(parsed);
+      const metrics=(parsed.key_metrics||[]).map(m=>`<span style="background:rgba(79,142,247,.15);color:var(--accent);border-radius:4px;padding:2px 6px;font-size:11px;">${m}</span>`).join(' ');
+      const dims=(parsed.dimensions||[]).map(d=>`<span style="background:rgba(124,92,191,.15);color:#a07de0;border-radius:4px;padding:2px 6px;font-size:11px;">${d}</span>`).join(' ');
+      box.className='result-box';
+      box.innerHTML=`<div style="display:flex;flex-direction:column;gap:6px;">
+        <div><span style="color:var(--muted);font-size:11px;">📂</span> <b>${parsed.dataset_type||''}</b> · <span style="color:var(--muted)">${parsed.domain||''}</span></div>
+        <div style="font-size:11px;color:var(--muted);">${parsed.analysis_context||''}</div>
+        ${metrics?`<div style="display:flex;flex-wrap:wrap;gap:4px;">${metrics}</div>`:''}
+        ${dims?`<div style="display:flex;flex-wrap:wrap;gap:4px;">${dims}</div>`:''}
+        ${parsed.data_quality_notes?`<div style="font-size:11px;color:var(--warn);">⚠️ ${parsed.data_quality_notes}</div>`:''}
+      </div>`;
+      if(parsed.suggested_questions?.length) renderDynamicTemplates(parsed.suggested_questions);
+    }else{ dataContext=raw; box.className='result-box'; box.textContent=raw; }
+  }catch(err){ box.className='result-box'; box.innerHTML=`<span style="color:var(--danger);">❌ ${err.message}</span>`; }
+  btn.disabled=false; btn.textContent='🔄 อัปเดตความเข้าใจ';
+}
+
+// ══════════════════════════════════════════════
+//  ANALYZE
+// ══════════════════════════════════════════════
+function checkAnalyzeReady(){
+  const apiKey=document.getElementById('apiKey').value.trim();
+  const ready=cachedData&&selectedFields.size>0&&apiKey.length>10;
+  document.getElementById('analyzeBtn').disabled=!ready;
+  if(cachedData) document.getElementById('dataContextCard').style.display='block';
+}
+async function runAnalysis(){
+  const apiKey=document.getElementById('apiKey').value.trim(), model=document.getElementById('modelSelect').value;
+  const sysP=document.getElementById('systemPrompt').value, userP=document.getElementById('promptInput').value.trim()||templates.summary;
+  const lang=document.getElementById('outputLang').value, mask=document.getElementById('maskSensitive').value;
+  const temp=parseFloat(document.getElementById('tempSlider').value)||0.4;
+  const dataStr=buildDataString();
+  if(!apiKey||!dataStr){ alert('กรุณาตรวจสอบ API Key และโหลดข้อมูล'); return; }
+
+  let safeData=dataStr;
+  if(mask==='patient') safeData=safeData.replace(/\b(HN\d+|[ก-ฮ]+ [ก-ฮ]+)\b/g,'[REDACTED]');
+
+  const langNote=lang==='th'?'ตอบเป็นภาษาไทยเท่านั้น':lang==='en'?'Respond in English only.':'ตอบทั้งภาษาไทยและ English';
+  const ctxNote=dataContext?`\n\n**บริบทข้อมูล:**\n${dataContext}`:'';
+
+  const wlEnabled=document.getElementById('wordLimitEnabled').checked;
+  const wlWords=parseInt(document.getElementById('wordLimitCustom').value)||250;
+  const wlScope=document.getElementById('wordLimitScope').value;
+  let wlNote='';
+  if(wlEnabled&&wlWords>0){
+    const sl=wlScope==='all'?'ทุก field รวมกัน':wlScope==='insight'?'เฉพาะ "insight"':'เฉพาะ "suggestions"';
+    wlNote=`\n\n⚠️ ตอบ${sl} ไม่เกิน **${wlWords} คำ**`;
+  }
+
+  const fullPrompt=`${langNote}${ctxNote}${wlNote}\n\n**ข้อมูล Tableau (${currentMode.toUpperCase()})**\n\`\`\`\n${safeData}\n\`\`\`\n\n**คำถาม:** ${userP}\n\nตอบ JSON เท่านั้น:\n{"insight":"...","suggestions":[{"priority":"สูง/กลาง/ต่ำ","action":"...","reason":"...","metric":"..."}],"followup_questions":[{"question":"...","why":"...","data_needed":"..."}],"confidence":"สูง/กลาง/ต่ำ","caveat":"..."}`;
+
+  document.getElementById('resultSection').style.display='block';
+  setTabLoading('insightBox','result-box'); setTabLoading('suggestionsBox','flex'); setTabLoading('followupBox','flex');
+  document.getElementById('analyzeBtn').disabled=true; switchResultTab('insight');
+
+  try{
+    const resp=await callOpenRouter(apiKey,model,sysP,fullPrompt,2000,temp);
+    const raw=resp.choices?.[0]?.message?.content||'{}';
+    let parsed; try{ parsed=JSON.parse(raw.replace(/```json|```/g,'').trim()); }catch(e){ parsed=null; }
+    if(parsed){
+      lastResult=parsed;
+      renderInsight(parsed.insight||'(ไม่มีผล)',parsed.confidence,parsed.caveat);
+      renderSuggestions(parsed.suggestions||[]);
+      renderFollowup(parsed.followup_questions||[]);
+      addHistory({time:new Date().toLocaleString('th-TH'),worksheet:document.getElementById('wsSelect').value,mode:currentMode,prompt:userP,result:parsed.insight||'',model,suggestions:parsed.suggestions||[],followup:parsed.followup_questions||[]});
+    }else{ document.getElementById('insightBox').className='result-box'; document.getElementById('insightBox').textContent=raw; }
+  }catch(err){ document.getElementById('insightBox').className='result-box'; document.getElementById('insightBox').innerHTML=`<span style="color:var(--danger);">❌ ${err.message}</span>`; }
+  document.getElementById('analyzeBtn').disabled=false;
+}
+
+// ══════════════════════════════════════════════
+//  MULTI-SHEET COMPARE (#2)
+// ══════════════════════════════════════════════
+let compareDataA=null, compareDataB=null;
+async function loadCompareSheets(){
+  const a=document.getElementById('wsCompareA').value, b=document.getElementById('wsCompareB').value;
+  if(!a||!b||a===b){ alert('กรุณาเลือก Worksheet ที่แตกต่างกัน 2 ชีต'); return; }
+  compareDataA=getMockOrReal(a); compareDataB=getMockOrReal(b);
+  document.getElementById('compareALabel').textContent='📊 '+a;
+  document.getElementById('compareBLabel').textContent='📊 '+b;
+  renderMiniPreview('previewA',compareDataA); renderMiniPreview('previewB',compareDataB);
+  document.getElementById('comparePreviewCard').style.display='block';
+  document.getElementById('comparePromptCard').style.display='block';
+  document.getElementById('compareBtn').style.display='flex';
+  document.getElementById('compareBtn').disabled=document.getElementById('apiKey').value.trim().length<=10;
+}
+function getMockOrReal(wsName){
+  const mocks={'KPI Overview':{columns:['Department','Admissions MTD','Revenue MTD','BOR%','Avg LOS'],rows:[{Department:'Medicine','Admissions MTD':'342','Revenue MTD':'4,250,000','BOR%':'82%','Avg LOS':'4.2'},{Department:'Surgery','Admissions MTD':'198','Revenue MTD':'6,100,000','BOR%':'75%','Avg LOS':'5.8'},{Department:'ICU','Admissions MTD':'45','Revenue MTD':'3,400,000','BOR%':'90%','Avg LOS':'8.4'}]},'Patient Summary':{columns:['Month','New Patients','OPD Visits','IPD Admissions','Satisfaction'],rows:[{Month:'Jan','New Patients':'1,240','OPD Visits':'12,450','IPD Admissions':'741','Satisfaction':'88%'},{Month:'Feb','New Patients':'1,180','OPD Visits':'11,200','IPD Admissions':'698','Satisfaction':'86%'},{Month:'Mar','New Patients':'1,310','OPD Visits':'13,100','IPD Admissions':'812','Satisfaction':'91%'}]},'Revenue Detail':{columns:['Service','Revenue','Margin','WoW Change','Budget Var'],rows:[{Service:'OPD',Revenue:'8,200,000',Margin:'37.8%','WoW Change':'+3.2%','Budget Var':'+2.1%'},{Service:'IPD',Revenue:'15,400,000',Margin:'36.4%','WoW Change':'-1.5%','Budget Var':'-0.8%'},{Service:'Lab',Revenue:'3,100,000',Margin:'61.3%','WoW Change':'+5.4%','Budget Var':'+4.2%'}]}};
+  return mocks[wsName]||mocks['KPI Overview'];
+}
+function renderMiniPreview(tableId,data){
+  const cols=data.columns, rows=data.rows.slice(0,3);
+  let html='<thead><tr>'+cols.slice(0,4).map(c=>`<th>${c}</th>`).join('')+'</tr></thead><tbody>';
+  rows.forEach(r=>{ html+='<tr>'+cols.slice(0,4).map(c=>`<td>${r[c]??''}</td>`).join('')+'</tr>'; });
+  html+='</tbody>'; document.getElementById(tableId).innerHTML=html;
+}
+async function runCompare(){
+  const apiKey=document.getElementById('apiKey').value.trim(), model=document.getElementById('modelSelect').value;
+  const sysP=document.getElementById('systemPrompt').value;
+  const userP=document.getElementById('comparePromptInput').value.trim()||'เปรียบเทียบ KPI หลักของทั้งสอง Worksheet และระบุความแตกต่างที่มีนัยสำคัญ';
+  const lang=document.getElementById('outputLang').value;
+  const temp=parseFloat(document.getElementById('tempSlider').value)||0.4;
+  const langNote=lang==='th'?'ตอบเป็นภาษาไทยเท่านั้น':lang==='en'?'Respond in English only.':'ตอบทั้งภาษาไทยและ English';
+
+  const strA=compareDataA.columns.join(' | ')+'\n'+compareDataA.rows.map(r=>compareDataA.columns.map(c=>r[c]??'').join(' | ')).join('\n');
+  const strB=compareDataB.columns.join(' | ')+'\n'+compareDataB.rows.map(r=>compareDataB.columns.map(c=>r[c]??'').join(' | ')).join('\n');
+  const wsA=document.getElementById('wsCompareA').value, wsB=document.getElementById('wsCompareB').value;
+
+  const prompt=`${langNote}\n\n**Sheet A: ${wsA}**\n\`\`\`\n${strA}\n\`\`\`\n\n**Sheet B: ${wsB}**\n\`\`\`\n${strB}\n\`\`\`\n\n**คำถาม:** ${userP}\n\nตอบ JSON เท่านั้น:\n{"summary":"สรุปภาพรวมการเปรียบเทียบ","key_differences":[{"metric":"...","sheet_a":"...","sheet_b":"...","interpretation":"..."}],"winner":"ชื่อ sheet ที่ดีกว่าหรือ 'ขึ้นอยู่กับ metric'","recommendations":["...","..."],"confidence":"สูง/กลาง/ต่ำ"}`;
+
+  const card=document.getElementById('compareResultCard'), box=document.getElementById('compareResultBox');
+  card.style.display='block'; box.className='result-box loading'; box.innerHTML='<div class="spinner"></div> กำลังเปรียบเทียบ...';
+  document.getElementById('compareBtn').disabled=true;
+
+  try{
+    const resp=await callOpenRouter(apiKey,model,sysP,prompt,2000,temp);
+    const raw=resp.choices?.[0]?.message?.content||'{}';
+    let parsed; try{ parsed=JSON.parse(raw.replace(/```json|```/g,'').trim()); }catch(e){ parsed=null; }
+    if(parsed){
+      lastCompareResult=parsed;
+      let html=`<div style="font-size:13px;font-weight:600;margin-bottom:10px;">${escHtml(parsed.summary||'')}</div>`;
+      if(parsed.key_differences?.length){
+        html+=`<div style="font-size:11px;color:var(--muted);margin-bottom:6px;font-weight:600;text-transform:uppercase;">KEY DIFFERENCES</div>`;
+        html+=parsed.key_differences.map(d=>`<div style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:8px;margin-bottom:6px;">
+          <div style="display:flex;gap:8px;align-items:center;margin-bottom:4px;">
+            <span style="font-weight:600;font-size:12px;">${escHtml(d.metric||'')}</span>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:11px;">
+            <div style="padding:4px 8px;background:rgba(79,142,247,.08);border-radius:4px;"><span style="color:var(--accent);">${escHtml(wsA)}</span><br>${escHtml(d.sheet_a||'')}</div>
+            <div style="padding:4px 8px;background:rgba(124,92,191,.08);border-radius:4px;"><span style="color:var(--accent2);">${escHtml(wsB)}</span><br>${escHtml(d.sheet_b||'')}</div>
+          </div>
+          <div style="font-size:11px;color:var(--muted);margin-top:4px;">💡 ${escHtml(d.interpretation||'')}</div>
+        </div>`).join('');
+      }
+      if(parsed.recommendations?.length){
+        html+=`<div style="margin-top:8px;font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;margin-bottom:4px;">RECOMMENDATIONS</div>`;
+        html+=parsed.recommendations.map((r,i)=>`<div style="font-size:12px;padding:4px 0;">✅ ${i+1}. ${escHtml(r)}</div>`).join('');
+      }
+      box.className='result-box'; box.innerHTML=html;
+      addHistory({time:new Date().toLocaleString('th-TH'),worksheet:`${wsA} vs ${wsB}`,mode:'compare',prompt:userP,result:parsed.summary||'',model,suggestions:[],followup:[]});
+    }else{ box.className='result-box'; box.textContent=raw; }
+  }catch(err){ box.className='result-box'; box.innerHTML=`<span style="color:var(--danger);">❌ ${err.message}</span>`; }
+  document.getElementById('compareBtn').disabled=false;
+}
+
+// ══════════════════════════════════════════════
+//  EXPORT (#1)
+// ══════════════════════════════════════════════
+function toggleExportMenu(tab){
+  const menu=document.getElementById('exportMenu-'+tab);
+  const wasOpen=menu.classList.contains('open');
+  closeAllExportMenus();
+  if(!wasOpen) menu.classList.add('open');
+}
+function closeAllExportMenus(){ document.querySelectorAll('.export-dropdown').forEach(m=>m.classList.remove('open')); }
+
+function exportAs(tab,format){
+  closeAllExportMenus();
+  if(!lastResult){ alert('กรุณาวิเคราะห์ข้อมูลก่อน'); return; }
+  const wsName=document.getElementById('wsSelect').value;
+
+  if(format==='copy'){
+    const el=document.getElementById(tab==='insight'?'insightBox':tab==='suggestions'?'suggestionsBox':'followupBox');
+    navigator.clipboard.writeText(el.textContent.trim());
+    showToast('📋 Copied!'); return;
+  }
+  if(format==='markdown'){
+    let md='';
+    if(tab==='insight') md=`## 🧠 Insight\n\n${lastResult.insight||''}\n\n**ความเชื่อมั่น:** ${lastResult.confidence||'-'}\n${lastResult.caveat?`\n> ⚠️ ${lastResult.caveat}`:''}\n`;
+    else if(tab==='suggestions') md=`## 🎯 Suggestions\n\n`+(lastResult.suggestions||[]).map((s,i)=>`${i+1}. **[${s.priority}]** ${s.action}\n   - เหตุผล: ${s.reason}\n   - Metric: ${s.metric}`).join('\n\n');
+    else md=`## 🔎 Follow-up Questions\n\n`+(lastResult.followup_questions||[]).map((f,i)=>`${i+1}. **${f.question}**\n   - ${f.why}\n   - ต้องการ: ${f.data_needed}`).join('\n\n');
+    navigator.clipboard.writeText(md); showToast('📝 Markdown copied!'); return;
+  }
+  if(format==='html') { downloadFile(buildReportHTML(tab), `insight-${tab}-${Date.now()}.html`, 'text/html'); return; }
+  if(format==='json') { downloadFile(JSON.stringify(lastResult,null,2), `insight-${tab}-${Date.now()}.json`, 'application/json'); return; }
+}
+
+function exportAll(format){
+  closeAllExportMenus();
+  if(!lastResult){ alert('กรุณาวิเคราะห์ข้อมูลก่อน'); return; }
+  if(format==='html') downloadFile(buildReportHTML('all'), `full-report-${Date.now()}.html`, 'text/html');
+  else downloadFile(JSON.stringify({...lastResult,worksheet:document.getElementById('wsSelect').value,timestamp:new Date().toISOString()},null,2), `full-report-${Date.now()}.json`, 'application/json');
+}
+
+function exportCompare(format){
+  closeAllExportMenus();
+  if(!lastCompareResult){ alert('กรุณาเปรียบเทียบก่อน'); return; }
+  if(format==='copy'){ navigator.clipboard.writeText(document.getElementById('compareResultBox').textContent.trim()); showToast('📋 Copied!'); return; }
+  if(format==='html') downloadFile(buildCompareHTML(), `compare-report-${Date.now()}.html`, 'text/html');
+  if(format==='json') downloadFile(JSON.stringify(lastCompareResult,null,2), `compare-report-${Date.now()}.json`, 'application/json');
+}
+
+function buildReportHTML(tab){
+  const ws=document.getElementById('wsSelect').value;
+  const now=new Date().toLocaleString('th-TH');
+  const model=document.getElementById('modelSelect').value;
+  const r=lastResult;
+  const insightHTML=tab==='all'||tab==='insight'?`<section><h2>🧠 Insight</h2><p style="white-space:pre-wrap">${r.insight||''}</p>${r.confidence?`<p><b>ความเชื่อมั่น:</b> ${r.confidence}</p>`:''} ${r.caveat?`<blockquote>⚠️ ${r.caveat}</blockquote>`:''}</section>`:'';
+  const sugHTML=tab==='all'||tab==='suggestions'?`<section><h2>🎯 Suggestions</h2>${(r.suggestions||[]).map((s,i)=>`<div class="card"><b>${i+1}. [${s.priority}] ${s.action}</b><br><small>${s.reason}</small>${s.metric?`<br><code>${s.metric}</code>`:''}</div>`).join('')}</section>`:'';
+  const fuHTML=tab==='all'||tab==='followup'?`<section><h2>🔎 Follow-up Questions</h2>${(r.followup_questions||[]).map((f,i)=>`<div class="card"><b>${i+1}. ${f.question}</b><br><small>${f.why}</small>${f.data_needed?`<br><code>ต้องการ: ${f.data_needed}</code>`:''}</div>`).join('')}</section>`:'';
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>AI Insight Report</title><style>body{font-family:'Sarabun',sans-serif;max-width:800px;margin:0 auto;padding:24px;color:#1e293b;} h1{color:#1e40af;} h2{color:#1d4ed8;border-bottom:2px solid #e2e8f0;padding-bottom:8px;} .card{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px;margin:8px 0;} .meta{color:#64748b;font-size:12px;margin-bottom:24px;} blockquote{border-left:4px solid #f59e0b;padding:8px 12px;background:#fffbeb;margin:8px 0;} code{background:#f1f5f9;padding:2px 6px;border-radius:4px;font-size:12px;}</style></head><body><h1>🔬 AI Insight Report</h1><div class="meta">📊 ${ws} &nbsp;|&nbsp; 🤖 ${model} &nbsp;|&nbsp; 🕐 ${now}</div>${insightHTML}${sugHTML}${fuHTML}</body></html>`;
+}
+function buildCompareHTML(){
+  const r=lastCompareResult; const a=document.getElementById('wsCompareA').value, b=document.getElementById('wsCompareB').value;
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Compare Report</title><style>body{font-family:'Sarabun',sans-serif;max-width:800px;margin:0 auto;padding:24px;} h1{color:#1e40af;} .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;} .card{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px;margin:8px 0;}</style></head><body><h1>🔄 Compare Report: ${a} vs ${b}</h1><p>${r.summary||''}</p><h2>Key Differences</h2>${(r.key_differences||[]).map(d=>`<div class="card"><b>${d.metric}</b><div class="grid"><div><b>${a}:</b> ${d.sheet_a}</div><div><b>${b}:</b> ${d.sheet_b}</div></div><p>${d.interpretation}</p></div>`).join('')}<h2>Recommendations</h2>${(r.recommendations||[]).map((rec,i)=>`<p>${i+1}. ${rec}</p>`).join('')}</body></html>`;
+}
+function downloadFile(content,filename,mime){
+  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([content],{type:mime}));
+  a.download=filename; a.click();
+}
+function showToast(msg){
+  let t=document.getElementById('toast');
+  if(!t){ t=document.createElement('div'); t.id='toast'; t.style.cssText='position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:#1e2335;border:1px solid #2a3050;border-radius:8px;padding:8px 16px;font-size:12px;color:#e2e8f8;z-index:9999;transition:opacity .3s;'; document.body.appendChild(t); }
+  t.textContent=msg; t.style.opacity='1';
+  setTimeout(()=>t.style.opacity='0',2000);
+}
+
+// ══════════════════════════════════════════════
+//  RENDER HELPERS
+// ══════════════════════════════════════════════
+function setTabLoading(id,display){
+  const el=document.getElementById(id);
+  if(display==='result-box'){ el.className='result-box loading'; el.innerHTML='<div class="spinner"></div> กำลังวิเคราะห์...'; }
+  else { el.style.display=display; el.innerHTML='<div class="flex items-center gap-6" style="color:var(--muted);font-size:12px;"><div class="spinner"></div> กำลังประมวลผล...</div>'; }
+}
+function renderInsight(text,confidence,caveat){
+  const box=document.getElementById('insightBox'); box.className='result-box';
+  const cc=confidence==='สูง'?'var(--success)':confidence==='กลาง'?'var(--warn)':'var(--danger)';
+  let html=`<div style="white-space:pre-wrap;line-height:1.75;">${escHtml(text)}</div>`;
+  if(confidence) html+=`<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border);font-size:11px;color:var(--muted);">ความเชื่อมั่น: <span style="color:${cc};font-weight:600;">${confidence}</span></div>`;
+  if(caveat) html+=`<div style="margin-top:6px;font-size:11px;color:var(--warn);">⚠️ ${escHtml(caveat)}</div>`;
+  box.innerHTML=html;
+}
+function renderSuggestions(items){
+  const box=document.getElementById('suggestionsBox');
+  if(!items.length){ box.innerHTML='<span style="color:var(--muted);font-size:12px;font-style:italic;">ไม่มี suggestions</span>'; return; }
+  const pc={'สูง':'var(--danger)','กลาง':'var(--warn)','ต่ำ':'var(--success)'};
+  box.innerHTML=items.map((s,i)=>`<div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px;border-left:3px solid ${pc[s.priority]||'var(--accent)'};">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;">
+      <span style="font-size:13px;font-weight:700;">${i+1}.</span>
+      <span style="font-size:11px;padding:2px 8px;border-radius:20px;background:${pc[s.priority]||'var(--accent)'}22;color:${pc[s.priority]||'var(--accent)'};font-weight:600;">${s.priority||'—'}</span>
+      ${s.metric?`<span style="margin-left:auto;font-size:10px;color:var(--muted);background:var(--surface);padding:2px 6px;border-radius:4px;">${escHtml(s.metric)}</span>`:''}
+    </div>
+    <div style="font-size:12.5px;font-weight:600;margin-bottom:4px;">🎯 ${escHtml(s.action||'')}</div>
+    <div style="font-size:11.5px;color:var(--muted);">💡 ${escHtml(s.reason||'')}</div>
+  </div>`).join('');
+}
+function renderFollowup(items){
+  const box=document.getElementById('followupBox');
+  if(!items.length){ box.innerHTML='<span style="color:var(--muted);font-size:12px;font-style:italic;">ไม่มีคำถามติดตาม</span>'; return; }
+  box.innerHTML=items.map((f,i)=>`<div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px;">
+    <div style="font-size:12.5px;font-weight:600;color:var(--accent);margin-bottom:4px;">🔎 ${escHtml(f.question||'')}</div>
+    <div style="font-size:11.5px;color:var(--muted);margin-bottom:4px;">📌 ${escHtml(f.why||'')}</div>
+    ${f.data_needed?`<div style="font-size:11px;color:var(--success);">📦 ต้องการ: ${escHtml(f.data_needed)}</div>`:''}
+    <button onclick="useFollowupAsPrompt(${i})" data-q="${escAttr(f.question||'')}" style="margin-top:6px;background:transparent;border:1px solid var(--border);border-radius:4px;padding:3px 8px;font-size:10px;color:var(--muted);cursor:pointer;font-family:var(--font);">▶ ใช้คำถามนี้</button>
+  </div>`).join('');
+}
+function useFollowupAsPrompt(i){
+  const btns=document.querySelectorAll('#followupBox button[data-q]');
+  if(btns[i]){ document.getElementById('promptInput').value=btns[i].dataset.q; updateTokenEst(); document.querySelector('.tab[data-tab="analyze"]').click(); }
+}
+function switchResultTab(name){
+  document.querySelectorAll('.result-tab').forEach(t=>{
+    const a=t.dataset.rtab===name;
+    t.style.borderBottomColor=a?'var(--accent)':'transparent';
+    t.style.color=a?'var(--accent)':'var(--muted)';
+  });
+  ['insight','suggestions','followup'].forEach(n=>document.getElementById('rtab-'+n).style.display=n===name?'block':'none');
+}
+
+// ══════════════════════════════════════════════
+//  WORD LIMIT
+// ══════════════════════════════════════════════
+function toggleWordLimit(){ const e=document.getElementById('wordLimitEnabled').checked; document.getElementById('wordLimitControls').style.display=e?'block':'none'; updateWordLimitBadge(); }
+function setWordLimit(val){ document.querySelectorAll('.wl-chip').forEach(c=>c.classList.toggle('active',parseInt(c.dataset.val)===val)); if(val>0) document.getElementById('wordLimitCustom').value=val; updateWordLimitBadge(); }
+function syncWordLimitFromInput(){ const v=parseInt(document.getElementById('wordLimitCustom').value)||0; document.querySelectorAll('.wl-chip').forEach(c=>c.classList.toggle('active',parseInt(c.dataset.val)===v)); updateWordLimitBadge(); }
+function updateWordLimitBadge(){
+  const e=document.getElementById('wordLimitEnabled').checked, v=parseInt(document.getElementById('wordLimitCustom').value)||0, b=document.getElementById('wordLimitBadge');
+  if(!e){b.style.background='rgba(122,133,163,.1)';b.style.color='var(--muted)';b.textContent='ปิดอยู่';}
+  else if(v===0){b.style.background='rgba(52,211,153,.1)';b.style.color='var(--success)';b.textContent='ไม่จำกัด';}
+  else{b.style.background='rgba(79,142,247,.15)';b.style.color='var(--accent)';b.textContent=`~${v} คำ`;}
+}
+
+// ══════════════════════════════════════════════
+//  API
+// ══════════════════════════════════════════════
+async function callOpenRouter(apiKey,model,system,user,maxTokens=1500,temp=0.4){
+  const r=await fetch('https://openrouter.ai/api/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${apiKey}`,'HTTP-Referer':window.location.href,'X-Title':'Tableau AI Insight Analyzer'},body:JSON.stringify({model,messages:[{role:'system',content:system},{role:'user',content:user}],max_tokens:maxTokens,temperature:temp})});
+  const d=await r.json(); if(d.error) throw new Error(d.error.message||'API Error'); return d;
+}
+
+// ══════════════════════════════════════════════
+//  SETTINGS
+// ══════════════════════════════════════════════
+function saveSettings(){
+  ['apiKey','modelSelect','systemPrompt','outputLang','maskSensitive'].forEach(id=>localStorage.setItem('ai_'+id,document.getElementById(id).value));
+  const msg=document.getElementById('settingsMsg'); msg.classList.remove('hidden'); setTimeout(()=>msg.classList.add('hidden'),2000);
+  checkAnalyzeReady();
+}
+function loadSettingsFromStorage(){
+  ['apiKey','modelSelect','systemPrompt','outputLang','maskSensitive'].forEach(id=>{ const v=localStorage.getItem('ai_'+id); if(v) document.getElementById(id).value=v; });
+}
+
+// ══════════════════════════════════════════════
+//  HISTORY (with search + filter)
+// ══════════════════════════════════════════════
+function addHistory(entry){ history.unshift(entry); if(history.length>50) history.pop(); localStorage.setItem('ai_insight_history',JSON.stringify(history)); renderHistory(); }
+function renderHistory(){
+  const search=(document.getElementById('historySearch')?.value||'').toLowerCase();
+  const filter=document.getElementById('historyFilter')?.value||'';
+  const filtered=history.filter(h=>{
+    const matchSearch=!search||(h.worksheet||'').toLowerCase().includes(search)||(h.prompt||'').toLowerCase().includes(search)||(h.result||'').toLowerCase().includes(search);
+    const matchFilter=!filter||h.mode===filter;
+    return matchSearch&&matchFilter;
+  });
+  const list=document.getElementById('historyList');
+  if(!filtered.length){ list.innerHTML='<div style="color:var(--muted);font-size:12px;padding:12px 0;text-align:center;font-style:italic;">ไม่พบรายการ</div>'; return; }
+  list.innerHTML=filtered.map((h,i)=>`<div class="history-item">
+    <div class="history-header" onclick="this.nextElementSibling.classList.toggle('open')">
+      <span>📊 ${h.worksheet||''}</span>
+      <span class="badge badge-ok">${h.mode||''}</span>
+      <span class="history-time">${h.time||''}</span>
+    </div>
+    <div class="history-body">
+      <div style="color:var(--muted);font-size:11px;margin-bottom:6px;">🤖 ${h.model||''}</div>
+      <div style="color:var(--accent);margin-bottom:6px;">❓ ${h.prompt||''}</div>
+      <div style="white-space:pre-wrap;font-size:12px;">${h.result||''}</div>
+      ${(h.suggestions||[]).length?`<div style="margin-top:8px;font-size:11px;color:var(--muted);">🎯 ${h.suggestions.length} suggestions</div>`:''}
+    </div>
+  </div>`).join('');
+}
+function clearHistory(){ if(!confirm('ล้างประวัติทั้งหมด?')) return; history=[]; localStorage.removeItem('ai_insight_history'); renderHistory(); }
+
+// ══════════════════════════════════════════════
+//  STATUS + UTILS
+// ══════════════════════════════════════════════
+function updateStatus(t,s){ const b=document.getElementById('statusBadge'); b.className=`badge badge-${t}`; b.innerHTML=`<span class="badge-dot"></span> ${s}`; }
+function escHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function escAttr(s){ return String(s).replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+</script>
+</body>
+</html>
