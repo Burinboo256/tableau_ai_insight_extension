@@ -1019,15 +1019,16 @@ function exportAs(tab,format){
 
   if(format==='copy'){
     const el=document.getElementById(tab==='insight'?'insightBox':tab==='suggestions'?'suggestionsBox':'followupBox');
-    navigator.clipboard.writeText(el.textContent.trim());
-    showToast('📋 Copied!'); return;
+    copyToClipboard(el.textContent.trim()).then(ok=>showToast(ok!==false?'📋 Copied!':'⚠️ Copy ไม่สำเร็จ'));
+    return;
   }
   if(format==='markdown'){
     let md='';
     if(tab==='insight') md=`## 🧠 Insight\n\n${lastResult.insight||''}\n\n**ความเชื่อมั่น:** ${lastResult.confidence||'-'}\n${lastResult.caveat?`\n> ⚠️ ${lastResult.caveat}`:''}\n`;
     else if(tab==='suggestions') md=`## 🎯 Suggestions\n\n`+(lastResult.suggestions||[]).map((s,i)=>`${i+1}. **[${s.priority}]** ${s.action}\n   - เหตุผล: ${s.reason}\n   - Metric: ${s.metric}`).join('\n\n');
     else md=`## 🔎 Follow-up Questions\n\n`+(lastResult.followup_questions||[]).map((f,i)=>`${i+1}. **${f.question}**\n   - ${f.why}\n   - ต้องการ: ${f.data_needed}`).join('\n\n');
-    navigator.clipboard.writeText(md); showToast('📝 Markdown copied!'); return;
+    copyToClipboard(md).then(ok=>showToast(ok!==false?'📝 Markdown copied!':'⚠️ Copy ไม่สำเร็จ'));
+    return;
   }
   if(format==='html') { downloadFile(buildReportHTML(tab), `insight-${tab}-${Date.now()}.html`, 'text/html'); return; }
   if(format==='json') { downloadFile(JSON.stringify(lastResult,null,2), `insight-${tab}-${Date.now()}.json`, 'application/json'); return; }
@@ -1043,7 +1044,7 @@ function exportAll(format){
 function exportCompare(format){
   closeAllExportMenus();
   if(!lastCompareResult){ alert('กรุณาเปรียบเทียบก่อน'); return; }
-  if(format==='copy'){ navigator.clipboard.writeText(document.getElementById('compareResultBox').textContent.trim()); showToast('📋 Copied!'); return; }
+  if(format==='copy'){ copyToClipboard(document.getElementById('compareResultBox').textContent.trim()).then(ok=>showToast(ok!==false?'📋 Copied!':'⚠️ Copy ไม่สำเร็จ')); return; }
   if(format==='html') downloadFile(buildCompareHTML(), `compare-report-${Date.now()}.html`, 'text/html');
   if(format==='json') downloadFile(JSON.stringify(lastCompareResult,null,2), `compare-report-${Date.now()}.json`, 'application/json');
 }
@@ -1063,8 +1064,33 @@ function buildCompareHTML(){
   return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Compare Report</title><style>body{font-family:'Sarabun',sans-serif;max-width:800px;margin:0 auto;padding:24px;} h1{color:#1e40af;} .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;} .card{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px;margin:8px 0;}</style></head><body><h1>🔄 Compare Report: ${a} vs ${b}</h1><p>${r.summary||''}</p><h2>Key Differences</h2>${(r.key_differences||[]).map(d=>`<div class="card"><b>${d.metric}</b><div class="grid"><div><b>${a}:</b> ${d.sheet_a}</div><div><b>${b}:</b> ${d.sheet_b}</div></div><p>${d.interpretation}</p></div>`).join('')}<h2>Recommendations</h2>${(r.recommendations||[]).map((rec,i)=>`<p>${i+1}. ${rec}</p>`).join('')}</body></html>`;
 }
 function downloadFile(content,filename,mime){
-  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([content],{type:mime}));
-  a.download=filename; a.click();
+  try{
+    const blob=new Blob([content],{type:mime});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a'); a.href=url; a.download=filename;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(()=>URL.revokeObjectURL(url),100);
+  }catch(e){
+    // Fallback: open in new window for iframe-restricted environments
+    const w=window.open('','_blank');
+    if(w){ w.document.write(mime==='text/html'?content:`<pre>${content.replace(/</g,'&lt;')}</pre>`); w.document.close(); }
+    else { showToast('⚠️ กรุณาอนุญาต Pop-up เพื่อ Export'); }
+  }
+}
+function copyToClipboard(text){
+  if(navigator.clipboard&&window.isSecureContext){
+    return navigator.clipboard.writeText(text).then(()=>true).catch(()=>fallbackCopy(text));
+  }
+  return Promise.resolve(fallbackCopy(text));
+}
+function fallbackCopy(text){
+  const ta=document.createElement('textarea');
+  ta.value=text; ta.style.cssText='position:fixed;left:-9999px;top:-9999px;opacity:0;';
+  document.body.appendChild(ta); ta.focus(); ta.select();
+  let ok=false;
+  try{ ok=document.execCommand('copy'); }catch(e){}
+  document.body.removeChild(ta);
+  return ok;
 }
 function showToast(msg){
   let t=document.getElementById('toast');
