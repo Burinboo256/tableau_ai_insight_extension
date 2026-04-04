@@ -553,14 +553,20 @@ document.addEventListener('DOMContentLoaded',()=>{
     if(!e.target.closest('.export-menu')) closeAllExportMenus();
   });
 
-  try{
-    tableau.extensions.initializeAsync().then(()=>{
-      tableauExt=tableau.extensions;
-      updateStatus('ok','เชื่อมต่อแล้ว');
-      try{ populateWorksheets(); }
-      catch(e){ updateStatus('err','ไม่พบ Worksheet บน Dashboard'); console.error('populateWorksheets error:',e); }
-    }).catch(e=>{ updateStatus('warn','Sandbox Mode'); console.warn('initializeAsync rejected:',e); populateMockWorksheets(); });
-  }catch(e){ updateStatus('warn','Sandbox Mode'); populateMockWorksheets(); }
+  if(typeof tableau==='undefined'){
+    updateStatus('warn','Tableau SDK ไม่โหลด');
+    populateMockWorksheets(); return;
+  }
+  tableau.extensions.initializeAsync().then(()=>{
+    tableauExt=tableau.extensions;
+    updateStatus('ok','เชื่อมต่อแล้ว');
+    try{ populateWorksheets(); }
+    catch(e){ updateStatus('err','ไม่พบ Worksheet บน Dashboard'); console.error('populateWorksheets error:',e); }
+  }).catch(e=>{
+    console.warn('initializeAsync rejected:',e);
+    updateStatus('warn','Sandbox Mode: '+(e&&e.message?e.message:'unknown'));
+    populateMockWorksheets();
+  });
 
   document.querySelectorAll('.tab').forEach(t=>{
     t.addEventListener('click',()=>{
