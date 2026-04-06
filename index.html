@@ -4,6 +4,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>AI Insight Analyzer</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔬</text></svg>">
 <script src="https://cdn.jsdelivr.net/gh/tableau/extensions-api@main/lib/tableau.extensions.1.latest.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
@@ -158,6 +159,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
 <!-- TABS -->
 <div class="tabs">
   <div class="tab active" data-tab="analyze">📊 วิเคราะห์</div>
+  <div class="tab" data-tab="result">📋 ผลลัพธ์</div>
   <div class="tab" data-tab="compare">🔄 เปรียบเทียบ</div>
   <div class="tab" data-tab="settings">⚙️ ตั้งค่า</div>
   <div class="tab" data-tab="history">🕘 ประวัติ</div>
@@ -171,12 +173,14 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
   <!-- Step 1: Worksheet -->
   <div class="card">
     <div class="card-title">📋 1. เลือก Worksheet</div>
-    <div class="ws-row">
-      <div>
-        <label>Worksheet</label>
-        <select id="wsSelect"><option value="">— รอเชื่อมต่อ Tableau —</option></select>
-      </div>
-      <button class="btn btn-outline btn-sm" onclick="loadWorksheet()">โหลด</button>
+    <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+      <span style="font-size:11px;color:var(--muted);" id="wsSelectCount">0 เลือก</span>
+      <button class="btn btn-outline btn-sm" onclick="selectAllWS()">ทั้งหมด</button>
+      <button class="btn btn-outline btn-sm" onclick="clearAllWS()">ล้าง</button>
+      <button class="btn btn-outline btn-sm" style="margin-left:auto;" onclick="loadWorksheet()">📥 โหลด</button>
+    </div>
+    <div id="wsCheckList" style="max-height:130px;overflow-y:auto;display:flex;flex-direction:column;gap:4px;padding:2px;">
+      <span style="color:var(--muted);font-size:12px;font-style:italic;">รอเชื่อมต่อ Tableau...</span>
     </div>
     <!-- Auto-refresh control -->
     <div style="margin-top:8px;display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--bg);border-radius:6px;border:1px solid var(--border);">
@@ -236,7 +240,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
       </label>
       <span class="text-xs text-muted" id="previewInfo"></span>
     </div>
-    <div class="preview-wrap"><table class="preview-table" id="previewTable"></table></div>
+    <div id="previewContainer"></div>
     <div id="anomalyLegend" style="display:none;margin-top:6px;gap:10px;" class="flex">
       <span style="font-size:10px;color:var(--danger);">🔴 ค่าสูงผิดปกติ (&gt;2σ)</span>
       <span style="font-size:10px;color:var(--success);">🟢 ค่าต่ำผิดปกติ (&lt;-2σ)</span>
@@ -323,73 +327,77 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
   <!-- Analyze Button -->
   <button class="analyze-btn" id="analyzeBtn" onclick="runAnalysis()" disabled>✨ วิเคราะห์ด้วย AI</button>
 
-  <!-- Result Tabs -->
-  <div id="resultSection" style="display:none;">
-    <div style="display:flex;background:var(--surface);border:1px solid var(--border);border-radius:8px 8px 0 0;overflow:hidden;">
-      <div class="result-tab active" data-rtab="insight" onclick="switchResultTab('insight')" style="flex:1;padding:8px;text-align:center;font-size:12px;font-weight:600;cursor:pointer;border-bottom:2px solid var(--accent);color:var(--accent);">🧠 Insight</div>
-      <div class="result-tab" data-rtab="suggestions" onclick="switchResultTab('suggestions')" style="flex:1;padding:8px;text-align:center;font-size:12px;font-weight:600;cursor:pointer;border-bottom:2px solid transparent;color:var(--muted);">🎯 Suggestions</div>
-      <div class="result-tab" data-rtab="followup" onclick="switchResultTab('followup')" style="flex:1;padding:8px;text-align:center;font-size:12px;font-weight:600;cursor:pointer;border-bottom:2px solid transparent;color:var(--muted);">🔎 Follow-up</div>
-    </div>
+</div><!-- /panel-analyze -->
 
-    <!-- Insight tab -->
-    <div id="rtab-insight" style="background:var(--card);border:1px solid var(--border);border-top:none;border-radius:0 0 8px 8px;padding:12px;">
-      <div class="flex items-center gap-6" style="margin-bottom:8px;">
-        <span class="text-xs text-muted">ผลการวิเคราะห์หลัก</span>
-        <div class="export-menu ml-auto">
-          <button class="btn btn-outline btn-sm" onclick="toggleExportMenu('insight')">📤 Export ▾</button>
-          <div class="export-dropdown" id="exportMenu-insight">
-            <div class="export-item" onclick="exportAs('insight','copy')">📋 Copy Text</div>
-            <div class="export-item" onclick="exportAs('insight','markdown')">📝 Copy Markdown</div>
-            <div class="export-item" onclick="exportAs('insight','html')">🌐 Download HTML</div>
-            <div class="export-item" onclick="exportAs('insight','json')">📦 Download JSON</div>
-          </div>
-        </div>
-      </div>
-      <div class="result-box" id="insightBox" style="min-height:100px;"><span class="result-placeholder">ผลการวิเคราะห์จะแสดงที่นี่...</span></div>
-    </div>
+<!-- ══════════════════ RESULT PANEL ══════════════════ -->
+<div class="panel" id="panel-result">
 
-    <!-- Suggestions tab -->
-    <div id="rtab-suggestions" style="display:none;background:var(--card);border:1px solid var(--border);border-top:none;border-radius:0 0 8px 8px;padding:12px;">
-      <div class="flex items-center gap-6" style="margin-bottom:8px;">
-        <span class="text-xs text-muted">Actions ที่แนะนำ</span>
-        <div class="export-menu ml-auto">
-          <button class="btn btn-outline btn-sm" onclick="toggleExportMenu('suggestions')">📤 Export ▾</button>
-          <div class="export-dropdown" id="exportMenu-suggestions">
-            <div class="export-item" onclick="exportAs('suggestions','copy')">📋 Copy Text</div>
-            <div class="export-item" onclick="exportAs('suggestions','markdown')">📝 Copy Markdown</div>
-            <div class="export-item" onclick="exportAs('suggestions','html')">🌐 Download HTML</div>
-            <div class="export-item" onclick="exportAs('suggestions','json')">📦 Download JSON</div>
-          </div>
-        </div>
-      </div>
-      <div id="suggestionsBox" style="display:flex;flex-direction:column;gap:8px;min-height:80px;"><span class="result-placeholder text-muted text-xs" style="font-style:italic;">กำลังรอผลการวิเคราะห์...</span></div>
-    </div>
-
-    <!-- Follow-up tab -->
-    <div id="rtab-followup" style="display:none;background:var(--card);border:1px solid var(--border);border-top:none;border-radius:0 0 8px 8px;padding:12px;">
-      <div class="flex items-center gap-6" style="margin-bottom:8px;">
-        <span class="text-xs text-muted">คำถามที่ควรตรวจสอบต่อ</span>
-        <div class="export-menu ml-auto">
-          <button class="btn btn-outline btn-sm" onclick="toggleExportMenu('followup')">📤 Export ▾</button>
-          <div class="export-dropdown" id="exportMenu-followup">
-            <div class="export-item" onclick="exportAs('followup','copy')">📋 Copy Text</div>
-            <div class="export-item" onclick="exportAs('followup','markdown')">📝 Copy Markdown</div>
-            <div class="export-item" onclick="exportAs('followup','html')">🌐 Download HTML</div>
-            <div class="export-item" onclick="exportAs('followup','json')">📦 Download JSON</div>
-          </div>
-        </div>
-      </div>
-      <div id="followupBox" style="display:flex;flex-direction:column;gap:6px;min-height:80px;"><span class="result-placeholder text-muted text-xs" style="font-style:italic;">กำลังรอผลการวิเคราะห์...</span></div>
-    </div>
-
-    <!-- Export ALL -->
-    <div style="margin-top:8px;display:flex;gap:6px;">
-      <button class="btn btn-outline btn-sm" style="flex:1;" onclick="exportAll('html')">📄 Export Report (HTML)</button>
-      <button class="btn btn-outline btn-sm" style="flex:1;" onclick="exportAll('json')">📦 Export All (JSON)</button>
-    </div>
+  <!-- Result sub-tabs -->
+  <div style="display:flex;background:var(--surface);border:1px solid var(--border);border-radius:8px 8px 0 0;overflow:hidden;">
+    <div class="result-tab active" data-rtab="insight" onclick="switchResultTab('insight')" style="flex:1;padding:8px;text-align:center;font-size:12px;font-weight:600;cursor:pointer;border-bottom:2px solid var(--accent);color:var(--accent);">🧠 Insight</div>
+    <div class="result-tab" data-rtab="suggestions" onclick="switchResultTab('suggestions')" style="flex:1;padding:8px;text-align:center;font-size:12px;font-weight:600;cursor:pointer;border-bottom:2px solid transparent;color:var(--muted);">🎯 Suggestions</div>
+    <div class="result-tab" data-rtab="followup" onclick="switchResultTab('followup')" style="flex:1;padding:8px;text-align:center;font-size:12px;font-weight:600;cursor:pointer;border-bottom:2px solid transparent;color:var(--muted);">🔎 Follow-up</div>
   </div>
 
-</div><!-- /panel-analyze -->
+  <!-- Insight tab -->
+  <div id="rtab-insight" style="background:var(--card);border:1px solid var(--border);border-top:none;border-radius:0 0 8px 8px;padding:12px;">
+    <div class="flex items-center gap-6" style="margin-bottom:8px;">
+      <span class="text-xs text-muted">ผลการวิเคราะห์หลัก</span>
+      <div class="export-menu ml-auto">
+        <button class="btn btn-outline btn-sm" onclick="toggleExportMenu('insight')">📤 Export ▾</button>
+        <div class="export-dropdown" id="exportMenu-insight">
+          <div class="export-item" onclick="exportAs('insight','copy')">📋 Copy Text</div>
+          <div class="export-item" onclick="exportAs('insight','markdown')">📝 Copy Markdown</div>
+          <div class="export-item" onclick="exportAs('insight','html')">🌐 Download HTML</div>
+          <div class="export-item" onclick="exportAs('insight','json')">📦 Download JSON</div>
+        </div>
+      </div>
+    </div>
+    <div class="result-box" id="insightBox" style="min-height:100px;"><span class="result-placeholder">กด "วิเคราะห์ด้วย AI" เพื่อเริ่มต้น...</span></div>
+  </div>
+
+  <!-- Suggestions tab -->
+  <div id="rtab-suggestions" style="display:none;background:var(--card);border:1px solid var(--border);border-top:none;border-radius:0 0 8px 8px;padding:12px;">
+    <div class="flex items-center gap-6" style="margin-bottom:8px;">
+      <span class="text-xs text-muted">Actions ที่แนะนำ</span>
+      <div class="export-menu ml-auto">
+        <button class="btn btn-outline btn-sm" onclick="toggleExportMenu('suggestions')">📤 Export ▾</button>
+        <div class="export-dropdown" id="exportMenu-suggestions">
+          <div class="export-item" onclick="exportAs('suggestions','copy')">📋 Copy Text</div>
+          <div class="export-item" onclick="exportAs('suggestions','markdown')">📝 Copy Markdown</div>
+          <div class="export-item" onclick="exportAs('suggestions','html')">🌐 Download HTML</div>
+          <div class="export-item" onclick="exportAs('suggestions','json')">📦 Download JSON</div>
+        </div>
+      </div>
+    </div>
+    <div id="suggestionsBox" style="display:flex;flex-direction:column;gap:8px;min-height:80px;"><span class="result-placeholder text-muted text-xs" style="font-style:italic;">ยังไม่มี Suggestions...</span></div>
+  </div>
+
+  <!-- Follow-up tab -->
+  <div id="rtab-followup" style="display:none;background:var(--card);border:1px solid var(--border);border-top:none;border-radius:0 0 8px 8px;padding:12px;">
+    <div class="flex items-center gap-6" style="margin-bottom:8px;">
+      <span class="text-xs text-muted">คำถามที่ควรตรวจสอบต่อ</span>
+      <button class="btn btn-outline btn-sm" style="margin-left:8px;" id="regenFollowupBtn" onclick="regenFollowup()">🔄 Re-gen</button>
+      <div class="export-menu ml-auto">
+        <button class="btn btn-outline btn-sm" onclick="toggleExportMenu('followup')">📤 Export ▾</button>
+        <div class="export-dropdown" id="exportMenu-followup">
+          <div class="export-item" onclick="exportAs('followup','copy')">📋 Copy Text</div>
+          <div class="export-item" onclick="exportAs('followup','markdown')">📝 Copy Markdown</div>
+          <div class="export-item" onclick="exportAs('followup','html')">🌐 Download HTML</div>
+          <div class="export-item" onclick="exportAs('followup','json')">📦 Download JSON</div>
+        </div>
+      </div>
+    </div>
+    <div id="followupBox" style="display:flex;flex-direction:column;gap:6px;min-height:80px;"><span class="result-placeholder text-muted text-xs" style="font-style:italic;">ยังไม่มี Follow-up Questions...</span></div>
+  </div>
+
+  <!-- Export ALL -->
+  <div style="margin-top:8px;display:flex;gap:6px;">
+    <button class="btn btn-outline btn-sm" style="flex:1;" onclick="exportAll('html')">📄 Export Report (HTML)</button>
+    <button class="btn btn-outline btn-sm" style="flex:1;" onclick="exportAll('json')">📦 Export All (JSON)</button>
+  </div>
+
+</div><!-- /panel-result -->
 
 <!-- ══════════════════ COMPARE PANEL ══════════════════ -->
 <div class="panel" id="panel-compare">
@@ -521,7 +529,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
   <div class="card">
     <div class="card-title">📐 System Prompt</div>
     <label>บทบาทของ AI</label>
-    <textarea id="systemPrompt" style="min-height:100px;">คุณเป็น Data Analyst ผู้เชี่ยวชาญด้านการวิเคราะห์ข้อมูลธุรกิจและโรงพยาบาล ตอบเป็นภาษาไทย ชัดเจน กระชับ และนำเสนอ insight ที่นำไปใช้ได้จริง ใช้ bullet points และ emoji เพื่อให้อ่านง่าย</textarea>
+    <textarea id="systemPrompt" style="min-height:100px;">คุณเป็น Senior Data Analyst ผู้เชี่ยวชาญด้านการวิเคราะห์ข้อมูลธุรกิจและโรงพยาบาล ตอบเป็นภาษาไทย โดยต้องวิเคราะห์อย่างละเอียดและครบถ้วน ประกอบด้วย: 1) ภาพรวมและ KPI สำคัญพร้อมตัวเลข 2) แนวโน้มและ pattern ที่พบ 3) จุดที่น่าสังเกตหรือผิดปกติ 4) การเปรียบเทียบระหว่างกลุ่ม/ช่วงเวลา 5) ปัจจัยที่ส่งผลและข้อเสนอแนะ ใช้ bullet points, ตัวเลขจริงจากข้อมูล และ emoji เพื่อให้อ่านง่าย ห้ามตอบสั้นหรือคลุมเครือ ต้องอ้างอิงตัวเลขจากข้อมูลที่ให้มาเสมอ</textarea>
   </div>
 
   <div class="card">
@@ -532,6 +540,16 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
       <option value="patient">ซ่อน Patient Name / HN</option>
       <option value="all">ซ่อนทุก PII</option>
     </select>
+  </div>
+
+  <div class="card">
+    <div class="card-title">📁 Log File</div>
+    <div id="logFolderStatus" style="font-size:11px;color:var(--muted);margin-bottom:8px;">ยังไม่ได้เลือกโฟลเดอร์</div>
+    <div style="display:flex;gap:8px;">
+      <button class="btn btn-outline btn-sm" style="flex:1;" onclick="pickLogFolder()">📂 เลือกโฟลเดอร์</button>
+      <button class="btn btn-danger btn-sm" onclick="clearLogFolder()">✕ ล้าง</button>
+    </div>
+    <div class="text-xs text-muted mt-6">บันทึก <code style="background:var(--surface);padding:1px 5px;border-radius:3px;">ai-insight-log-YYYY-MM.jsonl</code> ทุกครั้งที่วิเคราะห์</div>
   </div>
 
   <button class="btn btn-primary btn-full" onclick="saveSettings()">💾 บันทึกการตั้งค่า</button>
@@ -551,6 +569,10 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
     </select>
     <button class="btn btn-danger btn-sm" onclick="clearHistory()">🗑</button>
   </div>
+  <div style="display:flex;gap:6px;margin-top:4px;">
+    <button class="btn btn-outline btn-sm" style="flex:1;" onclick="exportHistory('json')">📦 Export ทั้งหมด (JSON)</button>
+    <button class="btn btn-outline btn-sm" style="flex:1;" onclick="exportHistory('csv')">📊 Export ทั้งหมด (CSV)</button>
+  </div>
   <div id="historyList"><div class="text-muted text-xs" style="padding:12px 0;text-align:center;font-style:italic;">ยังไม่มีประวัติ</div></div>
 </div>
 
@@ -566,6 +588,7 @@ let currentMode='kpi', cachedData=null, dataContext='';
 let autoRefreshHandler=null;
 let lastResult=null, lastCompareResult=null;
 let history=JSON.parse(localStorage.getItem('ai_insight_history')||'[]');
+let logDirHandle=null;
 
 // ══════════════════════════════════════════════
 //  INIT
@@ -573,6 +596,7 @@ let history=JSON.parse(localStorage.getItem('ai_insight_history')||'[]');
 document.addEventListener('DOMContentLoaded',()=>{
   loadSettingsFromStorage();
   renderHistory();
+  restoreLogFolder();
   document.getElementById('promptInput').addEventListener('input',updateTokenEst);
   document.addEventListener('click', e=>{
     if(!e.target.closest('.export-menu')) closeAllExportMenus();
@@ -606,47 +630,65 @@ document.addEventListener('DOMContentLoaded',()=>{
 // ══════════════════════════════════════════════
 //  TABLEAU
 // ══════════════════════════════════════════════
+function renderWSCheckList(names){
+  const list=document.getElementById('wsCheckList');
+  if(!names.length){ list.innerHTML='<span style="color:var(--muted);font-size:12px;font-style:italic;">ไม่พบ Worksheet</span>'; return; }
+  list.innerHTML=names.map(n=>`<label style="display:flex;align-items:center;gap:8px;padding:5px 8px;background:var(--bg);border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:12px;color:var(--text);"><input type="checkbox" value="${n}" class="ws-check" onchange="updateWSCount()" style="accent-color:var(--accent);cursor:pointer;"> ${n}</label>`).join('');
+  updateWSCount();
+}
+function getCheckedWS(){ return [...document.querySelectorAll('.ws-check:checked')].map(c=>c.value); }
+function updateWSCount(){ document.getElementById('wsSelectCount').textContent=getCheckedWS().length+' เลือก'; }
+function selectAllWS(){ document.querySelectorAll('.ws-check').forEach(c=>c.checked=true); updateWSCount(); }
+function clearAllWS(){ document.querySelectorAll('.ws-check').forEach(c=>c.checked=false); updateWSCount(); }
+
 function populateWorksheets(){
   const dash=tableauExt.dashboardContent.dashboard;
-  const opts='<option value="">— เลือก Worksheet —</option>'+dash.worksheets.map(w=>`<option value="${w.name}">${w.name}</option>`).join('');
-  document.getElementById('wsSelect').innerHTML=opts;
+  const names=dash.worksheets.map(w=>w.name);
+  renderWSCheckList(names);
+  const opts='<option value="">— เลือก Worksheet —</option>'+names.map(n=>`<option value="${n}">${n}</option>`).join('');
   document.getElementById('wsCompareA').innerHTML=opts;
   document.getElementById('wsCompareB').innerHTML=opts;
 }
 function populateMockWorksheets(){
-  const opts=`<option value="">— Mock —</option>
-    <option value="KPI Overview">KPI Overview</option>
-    <option value="Patient Summary">Patient Summary</option>
-    <option value="Revenue Detail">Revenue Detail</option>`;
-  ['wsSelect','wsCompareA','wsCompareB'].forEach(id=>document.getElementById(id).innerHTML=opts);
+  renderWSCheckList(['KPI Overview','Patient Summary','Revenue Detail']);
+  const opts=`<option value="">— Mock —</option><option value="KPI Overview">KPI Overview</option><option value="Patient Summary">Patient Summary</option><option value="Revenue Detail">Revenue Detail</option>`;
+  ['wsCompareA','wsCompareB'].forEach(id=>document.getElementById(id).innerHTML=opts);
 }
+
 async function loadWorksheet(){
-  const wsName=document.getElementById('wsSelect').value; if(!wsName) return;
-  if(!tableauExt){ loadMockData(wsName); return; }
+  const wsNames=getCheckedWS();
+  if(!wsNames.length){ showToast('⚠️ เลือก Worksheet ก่อน'); return; }
+  if(!tableauExt){
+    cachedData=wsNames.map(n=>{ const d=getMockData(n); return {name:n,...d}; });
+    const allCols=[...new Set(cachedData.flatMap(s=>s.columns))];
+    renderFieldPool(allCols); updatePreview(); checkAnalyzeReady(); return;
+  }
+  updateStatus('warn',`กำลังโหลด ${wsNames.length} sheets...`);
   try{
     const dash=tableauExt.dashboardContent.dashboard;
-    currentWorksheet=dash.worksheets.find(w=>w.name===wsName);
-    if(!currentWorksheet){ updateStatus('err','ไม่พบ Worksheet: '+wsName); return; }
-    let tbl;
-    // Try newer API (1.10+) first, fall back to legacy getSummaryDataAsync
-    if(typeof currentWorksheet.getSummaryDataReaderAsync==='function'){
-      const reader=await currentWorksheet.getSummaryDataReaderAsync(500,{});
-      tbl=await reader.getAllPagesAsync();
-      await reader.releaseAsync();
-    } else {
-      tbl=await currentWorksheet.getSummaryDataAsync({maxRows:500});
+    cachedData=[];
+    for(const wsName of wsNames){
+      const ws=dash.worksheets.find(w=>w.name===wsName);
+      if(!ws){ updateStatus('err','ไม่พบ Worksheet: '+wsName); return; }
+      let tbl;
+      if(typeof ws.getSummaryDataReaderAsync==='function'){
+        const reader=await ws.getSummaryDataReaderAsync(500,{});
+        tbl=await reader.getAllPagesAsync();
+        await reader.releaseAsync();
+      } else {
+        tbl=await ws.getSummaryDataAsync({maxRows:0});
+      }
+      const cols=tbl.columns.map(c=>c.fieldName);
+      const rows=tbl.data.map(row=>{ const o={}; row.forEach((cell,i)=>o[cols[i]]=cell.formattedValue); return o; });
+      cachedData.push({name:wsName,columns:cols,rows});
     }
-    processTblData(tbl);
-    updateStatus('ok','โหลดข้อมูลสำเร็จ');
+    const allCols=[...new Set(cachedData.flatMap(s=>s.columns))];
+    renderFieldPool(allCols); updatePreview(); checkAnalyzeReady();
+    updateStatus('ok',`โหลดสำเร็จ ${cachedData.length} sheet${cachedData.length>1?'s':''}`);
   }catch(e){
     console.error('loadWorksheet error:',e);
-    updateStatus('err','โหลด Worksheet ล้มเหลว: '+e.message);
+    updateStatus('err','โหลดล้มเหลว: '+e.message);
   }
-}
-function processTblData(table){
-  const cols=table.columns.map(c=>c.fieldName);
-  const rows=table.data.map(row=>{ const o={}; row.forEach((cell,i)=>o[cols[i]]=cell.formattedValue); return o; });
-  cachedData={columns:cols,rows}; renderFieldPool(cols); updatePreview(); checkAnalyzeReady();
 }
 
 // ══════════════════════════════════════════════
@@ -664,60 +706,30 @@ function toggleAutoRefresh(){
 
   const trigger=triggerSel.value;
   const dash=tableauExt.dashboardContent.dashboard;
-  const wsName=document.getElementById('wsSelect').value; if(!wsName) return;
-  const ws=dash.worksheets.find(w=>w.name===wsName); if(!ws) return;
+  const wsNames=getCheckedWS(); if(!wsNames.length) return;
 
   const handler=async()=>{
     await loadWorksheet();
     const apiKey=document.getElementById('apiKey').value.trim();
-    if(apiKey&&cachedData&&selectedFields.size>0) await runAnalysis();
+    if(apiKey&&cachedData&&cachedData.length>0&&selectedFields.size>0) await runAnalysis();
   };
 
+  const unsubs=[];
   if(trigger==='filter'||trigger==='both'){
-    const unsub=dash.addEventListener(tableau.TableauEventType.FilterChanged,handler);
-    autoRefreshHandler=unsub;
+    unsubs.push(dash.addEventListener(tableau.TableauEventType.FilterChanged,handler));
   }
   if(trigger==='mark'||trigger==='both'){
-    const unsub=ws.addEventListener(tableau.TableauEventType.MarkSelectionChanged,handler);
-    autoRefreshHandler=autoRefreshHandler?()=>{autoRefreshHandler();unsub();}:unsub;
+    wsNames.forEach(wsName=>{
+      const ws=dash.worksheets.find(w=>w.name===wsName); if(!ws) return;
+      unsubs.push(ws.addEventListener(tableau.TableauEventType.MarkSelectionChanged,handler));
+    });
   }
+  autoRefreshHandler=()=>unsubs.forEach(u=>u());
 }
 
 // ══════════════════════════════════════════════
 //  MOCK DATA
 // ══════════════════════════════════════════════
-function loadMockData(wsName){
-  const mocks={
-    'KPI Overview':{
-      columns:['Department','Admissions MTD','Admissions SPLY','Revenue MTD','BOR%','Avg LOS'],
-      rows:[
-        {Department:'Medicine','Admissions MTD':'342','Admissions SPLY':'310','Revenue MTD':'4,250,000','BOR%':'82%','Avg LOS':'4.2'},
-        {Department:'Surgery','Admissions MTD':'198','Admissions SPLY':'220','Revenue MTD':'6,100,000','BOR%':'75%','Avg LOS':'5.8'},
-        {Department:'Pediatrics','Admissions MTD':'156','Admissions SPLY':'140','Revenue MTD':'1,980,000','BOR%':'68%','Avg LOS':'3.1'},
-        {Department:'ICU','Admissions MTD':'45','Admissions SPLY':'52','Revenue MTD':'3,400,000','BOR%':'90%','Avg LOS':'8.4'},
-      ]
-    },
-    'Patient Summary':{
-      columns:['Month','New Patients','Returning','OPD Visits','IPD Admissions','Satisfaction'],
-      rows:[
-        {Month:'Jan','New Patients':'1,240','Returning':'3,820','OPD Visits':'12,450','IPD Admissions':'741','Satisfaction':'88%'},
-        {Month:'Feb','New Patients':'1,180','Returning':'3,650','OPD Visits':'11,200','IPD Admissions':'698','Satisfaction':'86%'},
-        {Month:'Mar','New Patients':'1,310','Returning':'3,940','OPD Visits':'13,100','IPD Admissions':'812','Satisfaction':'91%'},
-      ]
-    },
-    'Revenue Detail':{
-      columns:['Service','Revenue','Cost','Margin','WoW Change','Budget Var'],
-      rows:[
-        {Service:'OPD',Revenue:'8,200,000',Cost:'5,100,000',Margin:'37.8%','WoW Change':'+3.2%','Budget Var':'+2.1%'},
-        {Service:'IPD',Revenue:'15,400,000',Cost:'9,800,000',Margin:'36.4%','WoW Change':'-1.5%','Budget Var':'-0.8%'},
-        {Service:'Lab',Revenue:'3,100,000',Cost:'1,200,000',Margin:'61.3%','WoW Change':'+5.4%','Budget Var':'+4.2%'},
-        {Service:'Pharmacy',Revenue:'4,800,000',Cost:'3,200,000',Margin:'33.3%','WoW Change':'+0.8%','Budget Var':'+1.1%'},
-      ]
-    }
-  };
-  cachedData=mocks[wsName]||mocks['KPI Overview'];
-  renderFieldPool(cachedData.columns); updatePreview(); checkAnalyzeReady();
-}
 
 // ══════════════════════════════════════════════
 //  DATA MODE
@@ -760,17 +772,12 @@ function updateFieldSummary(){
 // ══════════════════════════════════════════════
 //  PREVIEW + ANOMALY HIGHLIGHT (#4 partial)
 // ══════════════════════════════════════════════
-function updatePreview(){
-  if(!cachedData) return;
-  document.getElementById('previewCard').style.display='block';
-  const cols=cachedData.columns, rows=cachedData.rows.slice(0,5);
-  const doHighlight=document.getElementById('anomalyHighlight').checked;
-
-  // Compute column stats for numeric anomaly detection
+function buildSheetTable(sheet,doHighlight){
+  const cols=sheet.columns, rows=sheet.rows.slice(0,5);
   const stats={};
   if(doHighlight){
     cols.forEach(c=>{
-      const nums=cachedData.rows.map(r=>parseFloat(String(r[c]).replace(/[,%]/g,''))).filter(v=>!isNaN(v));
+      const nums=sheet.rows.map(r=>parseFloat(String(r[c]).replace(/[,%]/g,''))).filter(v=>!isNaN(v));
       if(nums.length>2){
         const mean=nums.reduce((a,b)=>a+b,0)/nums.length;
         const std=Math.sqrt(nums.map(v=>(v-mean)**2).reduce((a,b)=>a+b,0)/nums.length);
@@ -778,10 +785,9 @@ function updatePreview(){
       }
     });
   }
-
-  let html='<thead><tr>'+cols.map(c=>`<th>${c}</th>`).join('')+'</tr></thead><tbody>';
+  let tbl='<table class="preview-table"><thead><tr>'+cols.map(c=>`<th>${c}</th>`).join('')+'</tr></thead><tbody>';
   rows.forEach(row=>{
-    html+='<tr>'+cols.map(c=>{
+    tbl+='<tr>'+cols.map(c=>{
       const raw=row[c]??''; let cls='';
       if(doHighlight&&stats[c]){
         const v=parseFloat(String(raw).replace(/[,%]/g,''));
@@ -793,11 +799,23 @@ function updatePreview(){
       return `<td${cls}>${raw}</td>`;
     }).join('')+'</tr>';
   });
-  html+='</tbody>';
-  document.getElementById('previewTable').innerHTML=html;
-  document.getElementById('previewInfo').textContent=`${cachedData.rows.length} rows × ${cols.length} cols`;
-  const hasStats=Object.keys(stats).length>0;
-  document.getElementById('anomalyLegend').style.display=doHighlight&&hasStats?'flex':'none';
+  tbl+='</tbody></table>';
+  return {tbl,hasStats:Object.keys(stats).length>0};
+}
+function updatePreview(){
+  if(!cachedData||!cachedData.length) return;
+  document.getElementById('previewCard').style.display='block';
+  const doHighlight=document.getElementById('anomalyHighlight').checked;
+  let anyStats=false;
+  const html=cachedData.map(sheet=>{
+    const {tbl,hasStats}=buildSheetTable(sheet,doHighlight);
+    if(hasStats) anyStats=true;
+    return `<div style="margin-bottom:10px;"><div style="font-size:11px;font-weight:600;color:var(--accent);margin-bottom:4px;">📊 ${sheet.name} <span style="color:var(--muted);font-weight:400;">(${sheet.rows.length} rows × ${sheet.columns.length} cols)</span></div><div class="preview-wrap">${tbl}</div></div>`;
+  }).join('');
+  document.getElementById('previewContainer').innerHTML=html;
+  const totalRows=cachedData.reduce((s,sh)=>s+sh.rows.length,0);
+  document.getElementById('previewInfo').textContent=`${totalRows} rows · ${cachedData.length} sheet${cachedData.length>1?'s':''}`;
+  document.getElementById('anomalyLegend').style.display=doHighlight&&anyStats?'flex':'none';
 }
 
 // ══════════════════════════════════════════════
@@ -807,19 +825,22 @@ function updateTokenEst(){
   const p=document.getElementById('promptInput').value;
   const d=buildDataString();
   document.getElementById('tokenEst').textContent=Math.round((p.length+d.length)/3.5).toLocaleString();
-  document.getElementById('dataRowsInfo').textContent=cachedData?`${cachedData.rows.length} rows loaded`:'—';
+  const totalRows=cachedData?cachedData.reduce((s,sh)=>s+sh.rows.length,0):0;
+  document.getElementById('dataRowsInfo').textContent=cachedData&&cachedData.length?`${totalRows} rows · ${cachedData.length} sheet${cachedData.length>1?'s':''}`:'—';
 }
 function buildDataString(){
-  if(!cachedData||selectedFields.size===0) return '';
-  const cols=cachedData.columns.filter(c=>selectedFields.has(c));
-  let rows=cachedData.rows;
-  if(currentMode==='kpi') rows=rows.slice(0,30);
-  else if(currentMode==='aggregate') rows=rows.slice(0,50);
-  else{
-    const lim=parseInt(document.getElementById('rowLimit').value)||50;
-    rows=document.getElementById('sampleType').value==='random'?rows.sort(()=>Math.random()-.5).slice(0,lim):rows.slice(0,lim);
-  }
-  return cols.join(' | ')+'\n'+rows.map(r=>cols.map(c=>r[c]??'').join(' | ')).join('\n');
+  if(!cachedData||!cachedData.length||selectedFields.size===0) return '';
+  const lim=parseInt(document.getElementById('rowLimit').value)||50;
+  const isRandom=document.getElementById('sampleType').value==='random';
+  return cachedData.map(sheet=>{
+    const cols=sheet.columns.filter(c=>selectedFields.has(c));
+    if(!cols.length) return null;
+    let rows=sheet.rows;
+    if(currentMode==='kpi') rows=rows.slice(0,30);
+    else if(currentMode==='aggregate') rows=rows.slice(0,50);
+    else rows=isRandom?[...rows].sort(()=>Math.random()-.5).slice(0,lim):rows.slice(0,lim);
+    return `### ${sheet.name} (${rows.length} rows)\n`+cols.join(' | ')+'\n'+rows.map(r=>cols.map(c=>r[c]??'').join(' | ')).join('\n');
+  }).filter(Boolean).join('\n\n');
 }
 
 // ══════════════════════════════════════════════
@@ -856,13 +877,16 @@ function renderDynamicTemplates(questions){
 async function runUnderstand(){
   const apiKey=document.getElementById('apiKey').value.trim();
   const provider=document.getElementById('providerSelect').value;
-  if((provider!=='ollama'&&!apiKey)||!cachedData){ alert('กรุณาใส่ API Key และโหลด Worksheet ก่อน'); return; }
-  const cols=cachedData.columns.filter(c=>selectedFields.has(c));
-  const sample=[cols.join(' | '),...cachedData.rows.slice(0,5).map(r=>cols.map(c=>r[c]??'').join(' | '))].join('\n');
-  const wsName=document.getElementById('wsSelect').value;
+  if((provider!=='ollama'&&!apiKey)||!cachedData||!cachedData.length){ alert('กรุณาใส่ API Key และโหลด Worksheet ก่อน'); return; }
+  const wsName=cachedData.map(s=>s.name).join(', ');
+  const sheetsDesc=cachedData.map(sheet=>{
+    const cols=sheet.columns.filter(c=>selectedFields.has(c));
+    const sample=[cols.join(' | '),...sheet.rows.slice(0,3).map(r=>cols.map(c=>r[c]??'').join(' | '))].join('\n');
+    return `**${sheet.name}** (${sheet.rows.length} rows) — Fields: ${cols.join(', ')}\n\`\`\`\n${sample}\n\`\`\``;
+  }).join('\n\n');
   const box=document.getElementById('dataContextBox'), btn=document.getElementById('understandBtn');
   box.className='result-box loading'; box.innerHTML='<div class="spinner"></div> AI กำลังอ่าน schema...'; btn.disabled=true;
-  const prompt=`ข้อมูลจาก Tableau Worksheet "${wsName}" (${cachedData.rows.length} แถว)\nFields: ${cols.join(', ')}\n\nตัวอย่าง:\n\`\`\`\n${sample}\n\`\`\`\n\nตอบ JSON เท่านั้น:\n{"dataset_type":"...","domain":"...","key_metrics":["..."],"dimensions":["..."],"data_quality_notes":"...","analysis_context":"...","suggested_questions":["...","...","..."]}`;
+  const prompt=`ข้อมูลจาก Tableau (${cachedData.length} worksheets)\n\n${sheetsDesc}\n\nตอบ JSON เท่านั้น:\n{"dataset_type":"...","domain":"...","key_metrics":["..."],"dimensions":["..."],"data_quality_notes":"...","analysis_context":"...","suggested_questions":["...","...","..."]}`;
   try{
     const raw=await callAI(apiKey,getModel(),'You are a data schema analyzer. Respond with valid JSON only.',prompt,600,0.2);
     let parsed=parseJSON(raw);
@@ -891,9 +915,9 @@ function checkAnalyzeReady(){
   const apiKey=document.getElementById('apiKey').value.trim();
   const provider=document.getElementById('providerSelect').value;
   const apiOk=provider==='ollama'||apiKey.length>10;
-  const ready=cachedData&&selectedFields.size>0&&apiOk;
+  const ready=cachedData&&cachedData.length>0&&selectedFields.size>0&&apiOk;
   document.getElementById('analyzeBtn').disabled=!ready;
-  if(cachedData) document.getElementById('dataContextCard').style.display='block';
+  if(cachedData&&cachedData.length>0) document.getElementById('dataContextCard').style.display='block';
 }
 async function runAnalysis(){
   const apiKey=document.getElementById('apiKey').value.trim(), model=getModel();
@@ -919,22 +943,36 @@ async function runAnalysis(){
     wlNote=`\n\n⚠️ ตอบ${sl} ไม่เกิน **${wlWords} คำ**`;
   }
 
-  const fullPrompt=`${langNote}${ctxNote}${wlNote}\n\n**ข้อมูล Tableau (${currentMode.toUpperCase()})**\n\`\`\`\n${safeData}\n\`\`\`\n\n**คำถาม:** ${userP}\n\nตอบ JSON เท่านั้น:\n{"insight":"...","suggestions":[{"priority":"สูง/กลาง/ต่ำ","action":"...","reason":"...","metric":"..."}],"followup_questions":[{"question":"...","why":"...","data_needed":"..."}],"confidence":"สูง/กลาง/ต่ำ","caveat":"..."}`;
+  const fullPrompt=`${langNote}${ctxNote}${wlNote}\n\n**ข้อมูล Tableau (${currentMode.toUpperCase()})**\n\`\`\`\n${safeData}\n\`\`\`\n\n**คำถาม:** ${userP}\n\nกฎสำคัญ: ต้องตอบ JSON เท่านั้น และทุก field ต้องมีเนื้อหาเสมอ (ห้าม null หรือ array ว่าง)\n- insight: string เดียวรวมทุก worksheet ละเอียดอย่างน้อย 5 ประเด็นพร้อมตัวเลขจริง ใช้ ## header และ bullet\n- suggestions: อย่างน้อย 3 รายการ พร้อม action ที่ชัดเจน\n- followup_questions: อย่างน้อย 3 คำถาม\n\n{"insight":"## ภาพรวม\\n• ...KPI พร้อมตัวเลข...\\n\\n## แนวโน้ม\\n• ...\\n\\n## จุดน่าสังเกต\\n• ...\\n\\n## เปรียบเทียบ\\n• ...\\n\\n## ข้อเสนอแนะ\\n• ...","suggestions":[{"priority":"สูง","action":"...action ชัดเจน...","reason":"...เหตุผลพร้อมตัวเลข...","metric":"...field name..."},{"priority":"กลาง","action":"...","reason":"...","metric":"..."}],"followup_questions":[{"question":"...","why":"...","data_needed":"..."},{"question":"...","why":"...","data_needed":"..."}],"confidence":"สูง/กลาง/ต่ำ","caveat":"..."}`;
 
-  document.getElementById('resultSection').style.display='block';
+  // Switch to result tab
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(x=>x.classList.remove('active'));
+  document.querySelector('.tab[data-tab="result"]').classList.add('active');
+  document.getElementById('panel-result').classList.add('active');
   setTabLoading('insightBox','result-box'); setTabLoading('suggestionsBox','flex'); setTabLoading('followupBox','flex');
   document.getElementById('analyzeBtn').disabled=true; switchResultTab('insight');
 
   try{
-    const raw=await callAI(apiKey,model,sysP,fullPrompt,2000,temp);
+    const raw=await callAI(apiKey,model,sysP,fullPrompt,4000,temp);
     let parsed=parseJSON(raw);
     if(parsed){
       lastResult=parsed;
       renderInsight(parsed.insight||'(ไม่มีผล)',parsed.confidence,parsed.caveat);
       renderSuggestions(parsed.suggestions||[]);
+
       renderFollowup(parsed.followup_questions||[]);
-      addHistory({time:new Date().toLocaleString('th-TH'),worksheet:document.getElementById('wsSelect').value,mode:currentMode,prompt:userP,result:parsed.insight||'',model,suggestions:parsed.suggestions||[],followup:parsed.followup_questions||[]});
-    }else{ document.getElementById('insightBox').className='result-box'; document.getElementById('insightBox').textContent=raw; }
+
+      const wsName=cachedData.map(s=>s.name).join(', ');
+      const logEntry={timestamp:new Date().toISOString(),time:new Date().toLocaleString('th-TH'),worksheet:wsName,mode:currentMode,provider:document.getElementById('providerSelect').value,model,temperature:temp,user_prompt:userP,full_prompt:fullPrompt,raw_response:raw,result:parsed};
+      addHistory({...logEntry,prompt:userP,result:parsed.insight||'',suggestions:parsed.suggestions||[],followup:parsed.followup_questions||[]});
+      writeLogEntry(logEntry);
+    }else{
+      // parseJSON failed completely — show raw as plain text but stripped of JSON wrapper
+      const box=document.getElementById('insightBox'); box.className='result-box';
+      const stripped=raw.replace(/^\s*\{?\s*"insight"\s*:\s*"?/,'').replace(/"?\s*,?\s*"suggestions"[\s\S]*/,'').replace(/\\n/g,'\n').replace(/\\"/g,'"').trim();
+      box.innerHTML=`<div style="line-height:1.75;font-size:12.5px;">${markdownToHtml(stripped||raw)}</div><div style="margin-top:8px;font-size:11px;color:var(--warn);">⚠️ ผลลัพธ์แสดงแบบ fallback (JSON parse ล้มเหลว)</div>`;
+    }
   }catch(err){ document.getElementById('insightBox').className='result-box'; document.getElementById('insightBox').innerHTML=`<span style="color:var(--danger);">❌ ${err.message}</span>`; }
   document.getElementById('analyzeBtn').disabled=false;
 }
@@ -971,7 +1009,7 @@ async function fetchWorksheetData(wsName){
     tbl=await reader.getAllPagesAsync();
     await reader.releaseAsync();
   } else {
-    tbl=await ws.getSummaryDataAsync({maxRows:500});
+    tbl=await ws.getSummaryDataAsync({maxRows:0});
   }
   const cols=tbl.columns.map(c=>c.fieldName);
   const rows=tbl.data.map(row=>{ const o={}; row.forEach((cell,i)=>o[cols[i]]=cell.formattedValue); return o; });
@@ -1029,7 +1067,9 @@ async function runCompare(){
         html+=parsed.recommendations.map((r,i)=>`<div style="font-size:12px;padding:4px 0;">✅ ${i+1}. ${escHtml(r)}</div>`).join('');
       }
       box.className='result-box'; box.innerHTML=html;
-      addHistory({time:new Date().toLocaleString('th-TH'),worksheet:`${wsA} vs ${wsB}`,mode:'compare',prompt:userP,result:parsed.summary||'',model,suggestions:[],followup:[]});
+      const logEntry={timestamp:new Date().toISOString(),time:new Date().toLocaleString('th-TH'),worksheet:`${wsA} vs ${wsB}`,mode:'compare',provider:document.getElementById('providerSelect').value,model,temperature:temp,user_prompt:userP,full_prompt:prompt,raw_response:raw,result:parsed};
+      addHistory({...logEntry,prompt:userP,result:parsed.summary||'',suggestions:[],followup:[]});
+      writeLogEntry(logEntry);
     }else{ box.className='result-box'; box.textContent=raw; }
   }catch(err){ box.className='result-box'; box.innerHTML=`<span style="color:var(--danger);">❌ ${err.message}</span>`; }
   document.getElementById('compareBtn').disabled=false;
@@ -1048,8 +1088,8 @@ function closeAllExportMenus(){ document.querySelectorAll('.export-dropdown').fo
 
 function exportAs(tab,format){
   closeAllExportMenus();
-  if(!lastResult){ alert('กรุณาวิเคราะห์ข้อมูลก่อน'); return; }
-  const wsName=document.getElementById('wsSelect').value;
+  if(!lastResult){ showToast('⚠️ กรุณาวิเคราะห์ข้อมูลก่อน'); return; }
+  const wsName=cachedData&&cachedData.length?cachedData.map(s=>s.name).join(', '):'—';
 
   if(format==='copy'){
     const el=document.getElementById(tab==='insight'?'insightBox':tab==='suggestions'?'suggestionsBox':'followupBox');
@@ -1070,9 +1110,10 @@ function exportAs(tab,format){
 
 function exportAll(format){
   closeAllExportMenus();
-  if(!lastResult){ alert('กรุณาวิเคราะห์ข้อมูลก่อน'); return; }
+  if(!lastResult){ showToast('⚠️ กรุณาวิเคราะห์ข้อมูลก่อน'); return; }
+  const wsName=cachedData&&cachedData.length?cachedData.map(s=>s.name).join(', '):'—';
   if(format==='html') downloadFile(buildReportHTML('all'), `full-report-${Date.now()}.html`, 'text/html');
-  else downloadFile(JSON.stringify({...lastResult,worksheet:document.getElementById('wsSelect').value,timestamp:new Date().toISOString()},null,2), `full-report-${Date.now()}.json`, 'application/json');
+  else downloadFile(JSON.stringify({...lastResult,worksheet:wsName,timestamp:new Date().toISOString()},null,2), `full-report-${Date.now()}.json`, 'application/json');
 }
 
 function exportCompare(format){
@@ -1084,7 +1125,7 @@ function exportCompare(format){
 }
 
 function buildReportHTML(tab){
-  const ws=document.getElementById('wsSelect').value;
+  const ws=cachedData&&cachedData.length?cachedData.map(s=>s.name).join(', '):'—';
   const now=new Date().toLocaleString('th-TH');
   const model=getModel();
   const r=lastResult;
@@ -1099,23 +1140,52 @@ function buildCompareHTML(){
 }
 function downloadFile(content,filename,mime){
   try{
-    const blob=new Blob([content],{type:mime});
+    const blob=new Blob([content],{type:mime+';charset=utf-8'});
     const url=URL.createObjectURL(blob);
-    const a=document.createElement('a'); a.href=url; a.download=filename;
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    setTimeout(()=>URL.revokeObjectURL(url),100);
+    const a=document.createElement('a');
+    a.href=url; a.download=filename; a.style.display='none';
+    document.body.appendChild(a);
+    a.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,view:window}));
+    document.body.removeChild(a);
+    setTimeout(()=>URL.revokeObjectURL(url),1000);
+    showToast('📥 ดาวน์โหลดแล้ว: '+filename);
   }catch(e){
-    // Fallback: open in new window for iframe-restricted environments
-    const w=window.open('','_blank');
-    if(w){ w.document.write(mime==='text/html'?content:`<pre>${content.replace(/</g,'&lt;')}</pre>`); w.document.close(); }
-    else { showToast('⚠️ กรุณาอนุญาต Pop-up เพื่อ Export'); }
+    showToast('⚠️ Export ไม่สำเร็จ: '+e.message);
+    console.error('downloadFile error:',e);
   }
 }
 function copyToClipboard(text){
   if(navigator.clipboard&&window.isSecureContext){
-    return navigator.clipboard.writeText(text).then(()=>true).catch(()=>fallbackCopy(text));
+    return navigator.clipboard.writeText(text).then(()=>true).catch(()=>Promise.resolve(fallbackCopy(text)));
   }
   return Promise.resolve(fallbackCopy(text));
+}
+function exportHistory(format){
+  if(!history.length){ showToast('ยังไม่มีประวัติ'); return; }
+  if(format==='json'){
+    downloadFile(JSON.stringify(history,null,2),`ai-insight-history-${Date.now()}.json`,'application/json');
+  } else if(format==='csv'){
+    const cols=['time','worksheet','mode','provider','model','temperature','user_prompt','result'];
+    const rows=history.map(h=>cols.map(k=>`"${String(h[k]||'').replace(/"/g,'""')}"`).join(','));
+    downloadFile([cols.join(','),...rows].join('\n'),`ai-insight-history-${Date.now()}.csv`,'text/csv');
+  }
+}
+function exportHistoryItem(i,format){
+  const h=history[i]; if(!h) return;
+  if(format==='json'){
+    downloadFile(JSON.stringify(h,null,2),`insight-${(h.worksheet||'data').replace(/[^a-zA-Z0-9ก-๙]/g,'_')}-${Date.now()}.json`,'application/json');
+  } else if(format==='html'){
+    const r=h.result||{};
+    const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Insight Report</title><style>body{font-family:'Sarabun',sans-serif;max-width:800px;margin:0 auto;padding:24px;color:#1e293b;}h2{color:#1d4ed8;border-bottom:2px solid #e2e8f0;padding-bottom:8px;}.card{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px;margin:8px 0;}.meta{color:#64748b;font-size:12px;margin-bottom:24px;}</style></head><body><h1>AI Insight Report</h1><div class="meta">📊 ${h.worksheet||''} &nbsp;|&nbsp; 🤖 ${h.model||''} &nbsp;|&nbsp; 🕐 ${h.time||''}</div><h2>🧠 Insight</h2><pre style="white-space:pre-wrap;font-family:inherit;">${String(r.insight||h.result||'')}</pre>${(r.suggestions||[]).length?`<h2>🎯 Suggestions</h2>${r.suggestions.map((s,i)=>`<div class="card"><b>${i+1}. [${s.priority}] ${s.action}</b><br><small>${s.reason}</small></div>`).join('')}`:''}${(r.followup_questions||[]).length?`<h2>🔎 Follow-up</h2>${r.followup_questions.map(f=>`<div class="card"><b>${f.question}</b><br><small>${f.why}</small></div>`).join('')}`:''}
+</body></html>`;
+    downloadFile(html,`insight-${(h.worksheet||'data').replace(/[^a-zA-Z0-9ก-๙]/g,'_')}-${Date.now()}.html`,'text/html');
+  }
+}
+function copyHistoryItem(i){
+  const h=history[i]; if(!h) return;
+  const r=h.result||{};
+  const text=`[${h.time}] ${h.worksheet} (${h.mode})\n\n${String(r.insight||h.result||'')}`;
+  copyToClipboard(text).then(ok=>showToast(ok!==false?'📋 Copied!':'⚠️ Copy ไม่สำเร็จ'));
 }
 function fallbackCopy(text){
   const ta=document.createElement('textarea');
@@ -1141,10 +1211,25 @@ function setTabLoading(id,display){
   if(display==='result-box'){ el.className='result-box loading'; el.innerHTML='<div class="spinner"></div> กำลังวิเคราะห์...'; }
   else { el.style.display=display; el.innerHTML='<div class="flex items-center gap-6" style="color:var(--muted);font-size:12px;"><div class="spinner"></div> กำลังประมวลผล...</div>'; }
 }
+function markdownToHtml(text){
+  return text
+    .split('\n')
+    .map(line=>{
+      if(/^##\s+/.test(line)) return `<div style="font-size:12.5px;font-weight:700;color:var(--accent);margin:10px 0 4px;">${escHtml(line.replace(/^##\s+/,''))}</div>`;
+      if(/^#\s+/.test(line))  return `<div style="font-size:13px;font-weight:700;color:var(--text);margin:10px 0 4px;">${escHtml(line.replace(/^#\s+/,''))}</div>`;
+      if(/^[•\-\*]\s/.test(line)) return `<div style="padding-left:12px;margin:2px 0;">• ${escHtml(line.replace(/^[•\-\*]\s/,''))}</div>`;
+      if(/^\d+\.\s/.test(line)) return `<div style="padding-left:12px;margin:2px 0;">${escHtml(line)}</div>`;
+      if(line.trim()==='') return '<div style="height:6px;"></div>';
+      return `<div style="margin:2px 0;">${escHtml(line)}</div>`;
+    })
+    .join('');
+}
 function renderInsight(text,confidence,caveat){
+  if(typeof text==='object'&&text!==null) text=Object.entries(text).map(([k,v])=>`## ${k}\n${v}`).join('\n\n');
+  text=String(text||'');
   const box=document.getElementById('insightBox'); box.className='result-box';
   const cc=confidence==='สูง'?'var(--success)':confidence==='กลาง'?'var(--warn)':'var(--danger)';
-  let html=`<div style="white-space:pre-wrap;line-height:1.75;">${escHtml(text)}</div>`;
+  let html=`<div style="line-height:1.75;font-size:12.5px;">${markdownToHtml(text)}</div>`;
   if(confidence) html+=`<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border);font-size:11px;color:var(--muted);">ความเชื่อมั่น: <span style="color:${cc};font-weight:600;">${confidence}</span></div>`;
   if(caveat) html+=`<div style="margin-top:6px;font-size:11px;color:var(--warn);">⚠️ ${escHtml(caveat)}</div>`;
   box.innerHTML=html;
@@ -1172,6 +1257,37 @@ function renderFollowup(items){
     ${f.data_needed?`<div style="font-size:11px;color:var(--success);">📦 ต้องการ: ${escHtml(f.data_needed)}</div>`:''}
     <button onclick="useFollowupAsPrompt(${i})" data-q="${escAttr(f.question||'')}" style="margin-top:6px;background:transparent;border:1px solid var(--border);border-radius:4px;padding:3px 8px;font-size:10px;color:var(--muted);cursor:pointer;font-family:var(--font);">▶ ใช้คำถามนี้</button>
   </div>`).join('');
+}
+async function regenFollowup(){
+  if(!lastResult){ showToast('⚠️ วิเคราะห์ข้อมูลก่อน'); return; }
+  const apiKey=document.getElementById('apiKey').value.trim();
+  const provider=document.getElementById('providerSelect').value;
+  if(provider!=='ollama'&&!apiKey){ showToast('⚠️ กรุณาใส่ API Key ก่อน'); return; }
+  const btn=document.getElementById('regenFollowupBtn');
+  btn.disabled=true; btn.textContent='⏳ กำลังสร้าง...';
+  const box=document.getElementById('followupBox');
+  box.innerHTML='<div class="flex items-center gap-6" style="color:var(--muted);font-size:12px;"><div class="spinner"></div> กำลังสร้างคำถามต่อเนื่อง...</div>';
+  try{
+    const sysP=document.getElementById('systemPrompt').value;
+    const suggestions=(lastResult.suggestions||[]).map((s,i)=>`${i+1}. [${s.priority}] ${s.action} — ${s.reason}`).join('\n');
+    const prompt=`จาก Insight และ Suggestions ด้านล่าง ให้สร้าง Follow-up Questions อย่างน้อย 5 ข้อที่ควรตรวจสอบต่อเพื่อวิเคราะห์ข้อมูลให้ลึกขึ้น\n\n**Insight:**\n${lastResult.insight||''}\n\n**Suggestions:**\n${suggestions}\n\nตอบ JSON array เท่านั้น:\n[{"question":"...คำถามที่ชัดเจน...","why":"...เหตุผลที่ควรถาม...","data_needed":"...ข้อมูลที่ต้องการเพิ่มเติม..."}]`;
+    const raw=await callAI(apiKey,getModel(),sysP,prompt,1000,0.5);
+    let parsed=parseJSON(raw);
+    if(Array.isArray(parsed)&&parsed.length){
+      lastResult.followup_questions=parsed;
+      renderFollowup(parsed);
+      showToast('✅ สร้างคำถามใหม่แล้ว');
+    } else if(parsed&&parsed.followup_questions){
+      lastResult.followup_questions=parsed.followup_questions;
+      renderFollowup(parsed.followup_questions);
+      showToast('✅ สร้างคำถามใหม่แล้ว');
+    } else {
+      box.innerHTML='<span style="color:var(--danger);font-size:12px;">❌ ไม่สามารถสร้างคำถามได้ ลองอีกครั้ง</span>';
+    }
+  }catch(e){
+    box.innerHTML=`<span style="color:var(--danger);font-size:12px;">❌ ${e.message}</span>`;
+  }
+  btn.disabled=false; btn.textContent='🔄 Re-gen';
 }
 function useFollowupAsPrompt(i){
   const btns=document.querySelectorAll('#followupBox button[data-q]');
@@ -1270,15 +1386,74 @@ function onProviderChange(silent){
   if(!silent) checkAnalyzeReady();
 }
 
+function escapeNewlinesInStrings(s){
+  // Escape actual newline/tab characters inside JSON string values (makes invalid JSON valid)
+  let result='',inStr=false,escape=false;
+  for(let i=0;i<s.length;i++){
+    const c=s[i];
+    if(escape){result+=c;escape=false;continue;}
+    if(c==='\\'&&inStr){result+=c;escape=true;continue;}
+    if(c==='"'){inStr=!inStr;result+=c;continue;}
+    if(inStr){
+      if(c==='\n'){result+='\\n';continue;}
+      if(c==='\r'){continue;} // strip CR
+      if(c==='\t'){result+='\\t';continue;}
+    }
+    result+=c;
+  }
+  return result;
+}
+function repairJSON(s){
+  // Auto-close unclosed strings, arrays, objects caused by truncated responses
+  let inStr=false,escape=false,obj=0,arr=0;
+  for(let i=0;i<s.length;i++){
+    const c=s[i];
+    if(escape){escape=false;continue;}
+    if(c==='\\'&&inStr){escape=true;continue;}
+    if(c==='"'){inStr=!inStr;continue;}
+    if(inStr) continue;
+    if(c==='{') obj++; else if(c==='}') obj--;
+    else if(c==='[') arr++; else if(c===']') arr--;
+  }
+  let fix=s;
+  if(inStr) fix+='"';
+  fix=fix.replace(/,\s*$/,'');
+  while(arr-->0) fix+=']';
+  while(obj-->0) fix+='}';
+  return fix;
+}
+function extractFieldsWithRegex(s){
+  // Last-resort: pull fields individually with regex when full parse fails
+  try{
+    // insight: grab everything between "insight":" and the next top-level key
+    const ins=s.match(/"insight"\s*:\s*"([\s\S]*?)(?=",\s*"(?:suggestions|confidence|caveat|followup_questions))/);
+    if(!ins) return null;
+    const insight=ins[1].replace(/\\n/g,'\n').replace(/\\t/g,'\t').replace(/\\"/g,'"').replace(/\\\\/g,'\\');
+    const conf=(s.match(/"confidence"\s*:\s*"([^"]+)"/))||[];
+    const cav=(s.match(/"caveat"\s*:\s*"([^"]+)"/))||[];
+    // try to extract suggestions array with repair
+    let suggestions=[];
+    const sugBlock=s.match(/"suggestions"\s*:\s*(\[[\s\S]*?\])\s*(?:,\s*"|\})/);
+    if(sugBlock){ try{ suggestions=JSON.parse(repairJSON(escapeNewlinesInStrings(sugBlock[1]))); }catch(e){} }
+    return {insight, confidence:conf[1]||'', caveat:cav[1]||'', suggestions, followup_questions:[]};
+  }catch(e){ return null; }
+}
 function parseJSON(raw){
   // 1. strip markdown code fences
   let s=raw.replace(/```json\s*/gi,'').replace(/```\s*/g,'').trim();
   // 2. try direct parse
   try{ return JSON.parse(s); }catch(e){}
-  // 3. extract first {...} block (handles leading/trailing text from LLM)
-  const m=s.match(/\{[\s\S]*\}/);
+  // 3. escape actual newlines inside strings
+  const safe=escapeNewlinesInStrings(s);
+  try{ return JSON.parse(safe); }catch(e){}
+  // 4. extract first {...} block
+  const m=safe.match(/\{[\s\S]*\}/);
   if(m){ try{ return JSON.parse(m[0]); }catch(e){} }
-  return null;
+  // 5. repair truncated JSON
+  try{ return JSON.parse(repairJSON(safe)); }catch(e){}
+  if(m){ try{ return JSON.parse(repairJSON(m[0])); }catch(e){} }
+  // 6. regex field extraction (last resort — still shows insight even if JSON is broken)
+  return extractFieldsWithRegex(safe)||extractFieldsWithRegex(s);
 }
 
 function getModel(){
@@ -1322,6 +1497,84 @@ async function callAI(apiKey,model,system,user,maxTokens=1500,temp=0.4){
 }
 
 // ══════════════════════════════════════════════
+//  LOG FILE (File System Access API + IndexedDB)
+// ══════════════════════════════════════════════
+function _openLogIDB(){
+  return new Promise((res,rej)=>{
+    const req=indexedDB.open('ai-insight-log',1);
+    req.onupgradeneeded=e=>e.target.result.createObjectStore('handles');
+    req.onsuccess=e=>res(e.target.result);
+    req.onerror=rej;
+  });
+}
+async function _saveHandleToIDB(handle){
+  const db=await _openLogIDB();
+  return new Promise((res,rej)=>{
+    const tx=db.transaction('handles','readwrite');
+    tx.objectStore('handles').put(handle,'logDir');
+    tx.oncomplete=res; tx.onerror=rej;
+  });
+}
+async function _loadHandleFromIDB(){
+  try{
+    const db=await _openLogIDB();
+    return new Promise((res)=>{
+      const tx=db.transaction('handles','readonly');
+      const r=tx.objectStore('handles').get('logDir');
+      r.onsuccess=()=>res(r.result||null);
+      r.onerror=()=>res(null);
+    });
+  }catch(e){ return null; }
+}
+async function restoreLogFolder(){
+  const handle=await _loadHandleFromIDB();
+  if(!handle) return;
+  try{
+    const perm=await handle.queryPermission({mode:'readwrite'});
+    if(perm==='granted'){ logDirHandle=handle; updateLogFolderUI(); }
+    else{ logDirHandle=handle; updateLogFolderUI('⚠️ รอการอนุญาต — คลิก "เลือกโฟลเดอร์" เพื่อยืนยันอีกครั้ง'); }
+  }catch(e){ logDirHandle=null; }
+}
+async function pickLogFolder(){
+  if(!window.showDirectoryPicker){ showToast('❌ Browser นี้ไม่รองรับ File System API'); return; }
+  try{
+    const handle=await window.showDirectoryPicker({mode:'readwrite'});
+    logDirHandle=handle;
+    await _saveHandleToIDB(handle);
+    updateLogFolderUI();
+    showToast('📁 เลือกโฟลเดอร์แล้ว');
+  }catch(e){ if(e.name!=='AbortError') showToast('❌ '+e.message); }
+}
+async function clearLogFolder(){
+  logDirHandle=null;
+  try{ const db=await _openLogIDB(); const tx=db.transaction('handles','readwrite'); tx.objectStore('handles').delete('logDir'); }catch(e){}
+  updateLogFolderUI('ยังไม่ได้เลือกโฟลเดอร์');
+  showToast('🗑 ล้างโฟลเดอร์ log แล้ว');
+}
+function updateLogFolderUI(msg){
+  const el=document.getElementById('logFolderStatus'); if(!el) return;
+  if(msg){ el.style.color='var(--muted)'; el.textContent=msg; return; }
+  if(logDirHandle){ el.style.color='var(--success)'; el.textContent='✅ '+logDirHandle.name; }
+  else{ el.style.color='var(--muted)'; el.textContent='ยังไม่ได้เลือกโฟลเดอร์'; }
+}
+async function writeLogEntry(entry){
+  if(!logDirHandle) return;
+  try{
+    const perm=await logDirHandle.requestPermission({mode:'readwrite'});
+    if(perm!=='granted'){ showToast('⚠️ ไม่ได้รับอนุญาตเขียนไฟล์'); return; }
+    const month=new Date().toISOString().slice(0,7);
+    const filename=`ai-insight-log-${month}.jsonl`;
+    const fileHandle=await logDirHandle.getFileHandle(filename,{create:true});
+    const file=await fileHandle.getFile();
+    const existing=await file.text();
+    const writable=await fileHandle.createWritable();
+    await writable.write(existing+JSON.stringify(entry)+'\n');
+    await writable.close();
+    showToast('💾 บันทึก log แล้ว');
+  }catch(e){ console.warn('writeLogEntry failed:',e); showToast('⚠️ เขียน log ไม่สำเร็จ: '+e.message); }
+}
+
+// ══════════════════════════════════════════════
 //  SETTINGS
 // ══════════════════════════════════════════════
 function saveSettings(){
@@ -1349,19 +1602,32 @@ function renderHistory(){
   });
   const list=document.getElementById('historyList');
   if(!filtered.length){ list.innerHTML='<div style="color:var(--muted);font-size:12px;padding:12px 0;text-align:center;font-style:italic;">ไม่พบรายการ</div>'; return; }
-  list.innerHTML=filtered.map((h,i)=>`<div class="history-item">
+  list.innerHTML=filtered.map((h,idx)=>{
+    const realIdx=history.indexOf(h);
+    return `<div class="history-item">
     <div class="history-header" onclick="this.nextElementSibling.classList.toggle('open')">
       <span>📊 ${h.worksheet||''}</span>
       <span class="badge badge-ok">${h.mode||''}</span>
       <span class="history-time">${h.time||''}</span>
     </div>
     <div class="history-body">
-      <div style="color:var(--muted);font-size:11px;margin-bottom:6px;">🤖 ${h.model||''}</div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+        <span style="color:var(--muted);font-size:11px;">🤖 ${h.model||''}</span>
+        ${h.provider?`<span style="font-size:10px;background:var(--surface);padding:1px 6px;border-radius:4px;color:var(--muted);">${h.provider}</span>`:''}
+        ${h.temperature!=null?`<span style="font-size:10px;color:var(--muted);">🌡 ${h.temperature}</span>`:''}
+        <div style="margin-left:auto;display:flex;gap:4px;">
+          <button onclick="event.stopPropagation();copyHistoryItem(${realIdx})" style="background:transparent;border:1px solid var(--border);border-radius:4px;padding:3px 8px;font-size:10px;color:var(--muted);cursor:pointer;font-family:var(--font);">📋 Copy</button>
+          <button onclick="event.stopPropagation();exportHistoryItem(${realIdx},'json')" style="background:transparent;border:1px solid var(--border);border-radius:4px;padding:3px 8px;font-size:10px;color:var(--muted);cursor:pointer;font-family:var(--font);">📦 JSON</button>
+          <button onclick="event.stopPropagation();exportHistoryItem(${realIdx},'html')" style="background:transparent;border:1px solid var(--border);border-radius:4px;padding:3px 8px;font-size:10px;color:var(--muted);cursor:pointer;font-family:var(--font);">🌐 HTML</button>
+        </div>
+      </div>
       <div style="color:var(--accent);margin-bottom:6px;">❓ ${h.prompt||''}</div>
       <div style="white-space:pre-wrap;font-size:12px;">${h.result||''}</div>
       ${(h.suggestions||[]).length?`<div style="margin-top:8px;font-size:11px;color:var(--muted);">🎯 ${h.suggestions.length} suggestions</div>`:''}
+      ${h.full_prompt?`<details style="margin-top:8px;"><summary style="font-size:11px;color:var(--muted);cursor:pointer;">📋 Full Prompt</summary><pre style="margin-top:6px;font-size:10px;color:var(--muted);white-space:pre-wrap;overflow-x:auto;background:var(--bg);padding:8px;border-radius:6px;border:1px solid var(--border);">${escHtml(h.full_prompt)}</pre></details>`:''}
+      ${h.raw_response?`<details style="margin-top:4px;"><summary style="font-size:11px;color:var(--muted);cursor:pointer;">📦 Raw Response</summary><pre style="margin-top:6px;font-size:10px;color:var(--muted);white-space:pre-wrap;overflow-x:auto;background:var(--bg);padding:8px;border-radius:6px;border:1px solid var(--border);">${escHtml(h.raw_response)}</pre></details>`:''}
     </div>
-  </div>`).join('');
+  </div>`;}).join('');
 }
 function clearHistory(){ if(!confirm('ล้างประวัติทั้งหมด?')) return; history=[]; localStorage.removeItem('ai_insight_history'); renderHistory(); }
 
